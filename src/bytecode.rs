@@ -1,6 +1,6 @@
 use std::{collections::HashMap, mem, ptr};
 
-use crate::{ast::AstNode, parser::Stmt, rt::RtRef};
+use crate::{ast::{AstNode, Function}, parser::Stmt, rt::RtRef};
 
 pub enum ByteCode {
     Push { val: RtRef },
@@ -8,13 +8,34 @@ pub enum ByteCode {
     Call { fn_idx: UHalf,
             push_val: bool,
      },
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    And,
-    Or,
+    Add {
+        arg1_idx: UHalf,
+        arg2_idx: UHalf,
+    },
+    Sub {
+        arg1_idx: UHalf,
+        arg2_idx: UHalf,
+    },
+    Mul {
+        arg1_idx: UHalf,
+        arg2_idx: UHalf,
+    },
+    Div {
+        arg1_idx: UHalf,
+        arg2_idx: UHalf,
+    },
+    Mod {
+        arg1_idx: UHalf,
+        arg2_idx: UHalf,
+    },
+    And {
+        arg1_idx: UHalf,
+        arg2_idx: UHalf,
+    },
+    Or {
+        arg1_idx: UHalf,
+        arg2_idx: UHalf,
+    },
     Jump { relative_off: isize },
     // the condition is stored on the stack
     JumpCond { relative_off: isize },
@@ -69,21 +90,76 @@ pub fn translate(stmts: Vec<Stmt>, fns: &Vec<(String, Box<dyn FnMut(&mut Vec<RtR
     code
 }
 
-fn translate_node(node: &AstNode, code: &mut Vec<ByteCode>, pops: &mut usize) {
+/// returns the corresponding stack index
+fn translate_node(node: &AstNode, code: &mut Vec<ByteCode>, pops: &mut usize, vars: &HashMap<String, usize>, funcs: HashMap<String, Function>, stack_idx: &mut usize) -> usize {
     match node {
-        AstNode::CallFunc { name, params } => todo!(),
+        AstNode::CallFunc { name, params } => {
+            let func = funcs.get(name).unwrap();
+
+            code.push(ByteCode::Call { fn_idx: func.idx, push_val: true }); // FIXME: should we push val?
+            *pops += 1;
+            *stack_idx += 1;
+
+            *stack_idx - 1
+        },
         AstNode::BinOp { lhs, rhs, op } => {
             match op {
                 crate::ast::BinOpKind::Add => {
-                    code.push()
-                    code.push(ByteCode::Add);
+                    let idx1 = translate_node(lhs, code, pops, vars, funcs, stack_idx);
+                    let idx2 = translate_node(rhs, code, pops, vars, funcs, stack_idx);
+                    code.push(ByteCode::Add {
+                        arg1_idx: idx1,
+                        arg2_idx: idx2,
+                    });
                 },
-                crate::ast::BinOpKind::Sub => todo!(),
-                crate::ast::BinOpKind::Mul => todo!(),
-                crate::ast::BinOpKind::Div => todo!(),
-                crate::ast::BinOpKind::Mod => todo!(),
-                crate::ast::BinOpKind::And => todo!(),
-                crate::ast::BinOpKind::Or => todo!(),
+                crate::ast::BinOpKind::Sub => {
+                    let idx1 = translate_node(lhs, code, pops, vars, funcs, stack_idx);
+                    let idx2 = translate_node(rhs, code, pops, vars, funcs, stack_idx);
+                    code.push(ByteCode::Sub {
+                        arg1_idx: idx1,
+                        arg2_idx: idx2,
+                    });
+                },
+                crate::ast::BinOpKind::Mul => {
+                    let idx1 = translate_node(lhs, code, pops, vars, funcs, stack_idx);
+                    let idx2 = translate_node(rhs, code, pops, vars, funcs, stack_idx);
+                    code.push(ByteCode::Mul {
+                        arg1_idx: idx1,
+                        arg2_idx: idx2,
+                    });
+                },
+                crate::ast::BinOpKind::Div => {
+                    let idx1 = translate_node(lhs, code, pops, vars, funcs, stack_idx);
+                    let idx2 = translate_node(rhs, code, pops, vars, funcs, stack_idx);
+                    code.push(ByteCode::Div {
+                        arg1_idx: idx1,
+                        arg2_idx: idx2,
+                    });
+                },
+                crate::ast::BinOpKind::Mod => {
+                    let idx1 = translate_node(lhs, code, pops, vars, funcs, stack_idx);
+                    let idx2 = translate_node(rhs, code, pops, vars, funcs, stack_idx);
+                    code.push(ByteCode::Mod {
+                        arg1_idx: idx1,
+                        arg2_idx: idx2,
+                    });
+                },
+                crate::ast::BinOpKind::And => {
+                    let idx1 = translate_node(lhs, code, pops, vars, funcs, stack_idx);
+                    let idx2 = translate_node(rhs, code, pops, vars, funcs, stack_idx);
+                    code.push(ByteCode::And {
+                        arg1_idx: idx1,
+                        arg2_idx: idx2,
+                    });
+                },
+                crate::ast::BinOpKind::Or => {
+                    let idx1 = translate_node(lhs, code, pops, vars, funcs, stack_idx);
+                    let idx2 = translate_node(rhs, code, pops, vars, funcs, stack_idx);
+                    code.push(ByteCode::Or {
+                        arg1_idx: idx1,
+                        arg2_idx: idx2,
+                    });
+                },
                 crate::ast::BinOpKind::Eq => todo!(),
                 crate::ast::BinOpKind::Ne => todo!(),
                 crate::ast::BinOpKind::Gt => todo!(),
@@ -95,6 +171,9 @@ fn translate_node(node: &AstNode, code: &mut Vec<ByteCode>, pops: &mut usize) {
         AstNode::Val(val) => {
             code.push(ByteCode::Push { val: *val });
             *pops += 1;
+            *stack_idx += 1;
+            *stack_idx - 1
         },
+        AstNode::Var { name } => vars.get(name).unwrap(),
     }
 }
