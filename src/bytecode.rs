@@ -95,10 +95,20 @@ fn translate_node(node: &AstNode, code: &mut Vec<ByteCode>, pops: &mut usize, va
     match node {
         AstNode::CallFunc { name, params } => {
             let func = funcs.get(name).unwrap();
+            
+            let mut call_pops = 0;
+            for param in params {
+                translate_node(param, code, &mut call_pops, vars, funcs, stack_idx);
+            }
 
             code.push(ByteCode::Call { fn_idx: func.idx, push_val: true }); // FIXME: should we push val?
             *pops += 1;
             *stack_idx += 1;
+
+            for _ in 0..pops {
+                code.push(ByteCode::Pop);
+            }
+            *stack_idx -= call_pops;
 
             *stack_idx - 1
         },
