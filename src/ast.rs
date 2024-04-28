@@ -1,8 +1,36 @@
-pub enum Card {
+use std::mem::transmute;
 
+use crate::{
+    parser::Stmt,
+    rt::{Player, RtRef},
+};
+
+// end_game(player: Option<Player>)
+// select_cards(cnt: usize, force_different: bool, allow_partial: bool)
+// select_players(cnt: usize, src: PlayerSrc, allow_partial: bool)
+// give_cards(inv: CardInventory, cards: Vec<CardVal>)
+// setup_inv(vis: Visibility, slots: Option<usize>)
+
+// FIXME: use implicit type conversions
+
+/*pub enum Action {
+    QueryUser {
+        query: UserQuery,
+    },
+    GiveCards {
+        inv: CardInventory,
+        cards: Vec<CardVal>,
+    },
+    SetupInventory {
+        vis: Visibility,
+        slots: Option<usize>,
+    },
+    EndGame {
+        winner: Option<Player>,
+    },
 }
 
-pub enum Action {
+pub enum UserQuery {
     SelectCards {
         cnt: usize,
         force_different: bool,
@@ -13,26 +41,7 @@ pub enum Action {
         src: PlayerSrc,
         allow_partial: bool,
     },
-    GiveCards {
-        inv: String,
-        cards: String,
-    },
-    SetupInventory {
-        vis: Visibility,
-        slots: Option<usize>,
-    },
-}
-
-pub enum Visibility {
-    None,
-    Select(Vec<usize>),
-    All,
-}
-
-pub enum CardInventory {
-    Player(usize),
-    Other(usize),
-}
+}*/
 
 pub enum PlayerSrc {
     Random,
@@ -40,4 +49,38 @@ pub enum PlayerSrc {
     NextRound,
     Select,
     // All,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum AstNode {
+    CallFunc {
+        name: String,
+        params: Vec<AstNode>,
+    },
+    BinOp {
+        lhs: Box<AstNode>,
+        rhs: Box<AstNode>,
+        op: BinOpKind,
+    },
+    Val(RtRef),
+    Var {
+        name: String,
+    },
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum BinOpKind {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod, // modulo
+    And,
+    Or,
+    Eq, // Equal
+    Ne, // NotEqual
+    Gt, // GreaterThan
+    Lt, // LessThan
+    Ge, // GreaterEqual
+    Le, // LessEqual
 }
