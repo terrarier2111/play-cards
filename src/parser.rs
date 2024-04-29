@@ -1,6 +1,7 @@
 use crate::{
     ast::AstNode,
-    lexer::{Token, TokenKind}, rt::RtRef,
+    lexer::{Token, TokenKind},
+    rt::RtRef,
 };
 
 struct Parser {
@@ -35,7 +36,10 @@ impl Parser {
         while !self.try_eat(TokenKind::CloseCurly) {
             stmts.push(self.parse_stmt()?);
         }
-        Ok(Stmt::Loop { stmts, condition: Box::new(cond)})
+        Ok(Stmt::Loop {
+            stmts,
+            condition: Box::new(cond),
+        })
     }
 
     fn parse_stmt(&mut self) -> anyhow::Result<Stmt> {
@@ -74,7 +78,7 @@ impl Parser {
                     }
                     _ => panic!("Can't parse var or func"),
                 }
-            },
+            }
             token => panic!("didn't expect token {:?}", token),
         }
     }

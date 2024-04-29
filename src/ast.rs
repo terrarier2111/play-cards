@@ -84,8 +84,3 @@ pub enum BinOpKind {
     Ge, // GreaterEqual
     Le, // LessEqual
 }
-
-pub struct Function {
-    pub idx: usize,
-    pub arg_cnt: usize,
-}
