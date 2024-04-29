@@ -144,6 +144,8 @@ fn translate_internal(
                 *stack_idx -= pops;
             }
             Stmt::Loop { stmts, condition } => {
+                // FIXME: rework this loop logic to jump (at the beginning of the loop) to the condition which we shall put at the end of the loop
+                // and only ever jump up if the statement is true
                 let loop_start_len = code.len();
                 let mut pops = 0;
                 // this is the argument for the condition which decides whether to continue with the loop
@@ -160,7 +162,7 @@ fn translate_internal(
                 // take the inverse of the condition
                 code.insert(prev_len, ByteCode::Sub { arg1_idx: TRUE_IDX as UHalf, arg2_idx: arg_idx as UHalf });
                 // skip the body if the inverse condition turns out to be true
-                code.insert(prev_len + 1, ByteCode::JumpCond { relative_off: body_size as isize, arg_idx: arg_idx as UHalf });
+                code.insert(prev_len + 1, ByteCode::JumpCond { relative_off: full_body_size as isize, arg_idx: arg_idx as UHalf });
                 // cleanup for when we enter the loop
                 for i in 0..pops {
                     code.insert(prev_len + 2 + i, ByteCode::Pop { offset: 0 });
@@ -168,12 +170,41 @@ fn translate_internal(
                 // go back to the beginning of the loop and retest its condition
                 code.push(ByteCode::Jump { relative_off: -((code.len() - loop_start_len) as isize) });
                 // cleanup for when we exit the loop
-                for i in 0..pops {
+                for _ in 0..pops {
                     code.push(ByteCode::Pop { offset: 0 });
                 }
             }
             Stmt::Conditional { seq, fallback } => {
-                let mut condition_indices = vec![];
+                let mut jump_indices = vec![];
+                for (cond, stmts) in seq.iter() {
+                    let mut pops = 0;
+                    let cond_val_idx = translate_node(&cond, code, &mut pops, vars, fns, stack_idx, &mut curr_scope.stack_size);
+                    let cond_idx = code.len();
+                    
+                    let prev_code_size = code.len();
+                    // cleanup condition data, if taken
+                    for _ in 0..pops {
+                        code.push(ByteCode::Pop { offset: 1 });
+                    }
+                    translate_internal(stmts, fns, stack_idx, vars, code);
+                    let code_size = code.len() - prev_code_size;
+                    code.insert(cond_idx, ByteCode::JumpCond { relative_off: code_size as isize, arg_idx: cond_val_idx as UHalf });
+                    // here, a unconditional jump to the end of the if statement will be inserted to skip any other conditional checks
+                    // which ensures we are only ever taking a single path, not 2 or more
+                    jump_indices.push(code.len());
+                    // cleanup condition data, if not taken
+                    for _ in 0..pops {
+                        code.push(ByteCode::Pop { offset: 1 });
+                    }
+                }
+                // insert the fallback (if present)
+                translate_internal(fallback, fns, stack_idx, vars, code);
+                // insert the jumps to the end of the if-(else) construct to ensure only 1 branch is ever taken
+                for idx in jump_indices.iter().rev() {
+                    let end = code.len();
+                    let off = end - *idx;
+                    code.push(ByteCode::Jump { relative_off: off as isize });
+                }
             }
         }
     }
