@@ -77,11 +77,16 @@ struct Scope {
     stack_size: usize,
 }
 
+const TRUE_IDX: usize = 0;
+
 pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
     let mut code = vec![];
     let mut vars = HashMap::new();
     let mut stack_idx = 0;
+    // used in jump conditional code to reverse the condition (this is pretty hacky but works and is fast)
+    code.push(ByteCode::Push { val: RtRef::bool(true) });
     translate_internal(stmts, fns, &mut stack_idx, &mut vars, &mut code);
+    code.push(ByteCode::Pop);
     code
 }
 
@@ -134,11 +139,36 @@ fn translate_internal(
                     param_pops: pops as u8,
                 });
                 curr_scope.stack_size -= pops;
+                *stack_idx -= pops;
             }
             Stmt::Loop { stmts, condition } => {
-                let idx = code.len() - 1;
+                let loop_start_len = code.len();
+                let mut pops = 0;
+                // this is the argument for the condition which decides whether to continue with the loop
+                let arg_idx = translate_node(&condition, code, &mut pops, vars, fns, stack_idx, &mut curr_scope.stack_size);
+
+                let prev_len = code.len();
                 translate(stmts, fns);
-                // FIXME: translate condition to a conditional jump to idx
+                let body_size = code.len() - prev_len;
+
+                // this includes the normal body size and all the additional code we generated for loop maintenance
+                // the + 1 if from the unconditional Jump we use to go back to the condition at the end of the loop
+                let full_body_size = body_size + pops + 1;
+                
+                // take the inverse of the condition
+                code.insert(prev_len, ByteCode::Sub { arg1_idx: TRUE_IDX as UHalf, arg2_idx: arg_idx as UHalf });
+                // skip the body if the inverse condition turns out to be true
+                code.insert(prev_len + 1, ByteCode::JumpCond { relative_off: body_size as isize, arg_idx: arg_idx as UHalf });
+                // cleanup for when we enter the loop
+                for i in 0..pops {
+                    code.insert(prev_len + 2 + i, ByteCode::Pop);
+                }
+                // go back to the beginning of the loop and retest its condition
+                code.push(ByteCode::Jump { relative_off: -((code.len() - loop_start_len) as isize) });
+                // cleanup for when we exit the loop
+                for i in 0..pops {
+                    code.push(ByteCode::Pop);
+                }
             }
             Stmt::Conditional { seq, fallback } => {
                 let mut condition_indices = vec![];
