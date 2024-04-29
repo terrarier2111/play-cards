@@ -3,7 +3,10 @@ use std::{fmt::Debug, mem::transmute, num::NonZeroU64};
 use crate::nan_box::{NanBox64, TagBuilder};
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct RtRef(NanBox64);
+pub struct RtRef {
+    ty: RtType,
+    val: usize,
+}
 
 impl Debug for RtRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -12,46 +15,41 @@ impl Debug for RtRef {
 }
 
 impl RtRef {
-    const TY_MASK: u64 = (1 << 3) - 1;
-    const VAL_SHIFT: u64 = 3;
-    pub const NULL: RtRef = Self(NanBox64::new_tag(TagBuilder::new_full_tag(unsafe {
-        NonZeroU64::new_unchecked(RtType::None as u64)
-    })));
+    pub const NULL: RtRef = Self {
+        ty: RtType::None,
+        val: 0,
+    };
 
     pub fn ty(self) -> RtType {
-        if !self.0.is_tagged() {
-            return RtType::Decimal;
-        }
-        unsafe { transmute(self.0.get_tag().get_val() & Self::TY_MASK) }
+        self.ty
     }
 
     pub(crate) fn dst(self) -> *mut () {
-        (unsafe { self.0.get_tag().get_val() } >> Self::VAL_SHIFT) as *mut ()
+        self.val as *mut ()
     }
 
     #[inline]
     pub fn bool(val: bool) -> Self {
-        println!("ty bits: {}", ((RtType::Bool as u64) | ((val as u8 as u64) << Self::VAL_SHIFT)));
-        Self(NanBox64::new_tag(TagBuilder::new_full_tag(unsafe {
-            NonZeroU64::new_unchecked(
-                (RtType::Bool as u64) | ((val as u8 as u64) << Self::VAL_SHIFT),
-            )
-        })))
+        Self {
+            ty: RtType::Bool,
+            val: val as u8 as usize,
+        }
     }
 
     #[inline]
     pub fn decimal(val: f64) -> Self {
-        Self(NanBox64::new_float(val))
+        Self {
+            ty: RtType::Decimal,
+            val: unsafe { transmute(val) },
+        }
     }
 
     pub fn string(val: Box<String>) -> Self {
         let ptr = Box::into_raw(val);
-        Self(NanBox64::new_tag(TagBuilder::new_full_tag(
-            NonZeroU64::new(
-                ((ptr as usize as u64) << Self::VAL_SHIFT) | (RtType::String as u8 as u64),
-            )
-            .unwrap(),
-        )))
+        Self {
+            ty: RtType::String,
+            val: ptr as usize,
+        }
     }
 
     pub fn get_player(self) -> Option<Player> {
@@ -83,7 +81,7 @@ impl RtRef {
     }
 
     pub(crate) unsafe fn get_decimal_directly(self) -> f64 {
-        unsafe { self.0.float }
+        unsafe { transmute(self.val) }
     }
 
     pub fn get_decimal(self) -> Option<f64> {
@@ -106,7 +104,7 @@ impl RtRef {
     }
 
     pub(crate) unsafe fn get_bool_directly(self) -> bool {
-        unsafe { transmute((self.0.get_tag().get_val() >> RtRef::VAL_SHIFT) as u8) }
+        unsafe { transmute(self.val as u8) }
     }
 
     pub fn get_bool(self) -> Option<bool> {
@@ -151,7 +149,7 @@ impl Ordering {
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u64)]
 pub enum RtType {
-    Decimal,
+    Decimal = 0,
     None = 1,
     Bool = 2,
     String = 3,
