@@ -8,6 +8,8 @@ use crate::{
     rt::{RtRef, RtType},
 };
 
+// FIXME: get rid of param_pops somehow (if possible)
+
 #[repr(u8)]
 pub enum ByteCode {
     Push {
@@ -17,37 +19,51 @@ pub enum ByteCode {
     Call {
         fn_idx: u8,
         push_val: bool,
+        arg_indices: ThinVec<UHalf>,
         /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
         param_pops: u8,
-        arg_indices: ThinVec<UHalf>,
     },
     Add {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
+        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
+        param_pops: u8,
     },
     Sub {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
+        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
+        param_pops: u8,
     },
     Mul {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
+        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
+        param_pops: u8,
     },
     Div {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
+        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
+        param_pops: u8,
     },
     Mod {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
+        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
+        param_pops: u8,
     },
     And {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
+        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
+        param_pops: u8,
     },
     Or {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
+        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
+        param_pops: u8,
     },
     Jump {
         relative_off: isize,
@@ -104,12 +120,10 @@ fn translate_internal(
     for stmt in stmts {
         match stmt {
             Stmt::DefineVar { name, val } => {
+                let mut _pops = 0;
+                let var_idx = translate_node(val, code, &mut _pops, vars, fns, stack_idx, &mut curr_scope.stack_size);
                 curr_scope.vars.push(name.clone());
-                curr_scope.stack_size += 1;
-                vars.insert(name.clone(), *stack_idx);
-                *stack_idx += 1;
-
-                // FIXME: evaluate `val` and push it on the stack
+                vars.insert(name.clone(), var_idx);
             }
             Stmt::CallFunc { name, args } => {
                 let fn_idx = resolve_fn_idx(fns, name);
@@ -156,7 +170,7 @@ fn translate_internal(
                 let full_body_size = body_size + pops + 1;
                 
                 // take the inverse of the condition
-                code.insert(prev_len, ByteCode::Sub { arg1_idx: TRUE_IDX as UHalf, arg2_idx: arg_idx as UHalf });
+                code.insert(prev_len, ByteCode::Sub { arg1_idx: TRUE_IDX as UHalf, arg2_idx: arg_idx as UHalf, param_pops: 0 });
                 // skip the body if the inverse condition turns out to be true
                 code.insert(prev_len + 1, ByteCode::JumpCond { relative_off: body_size as isize, arg_idx: arg_idx as UHalf });
                 // cleanup for when we enter the loop
@@ -229,10 +243,11 @@ fn translate_node(
         }
         AstNode::BinOp { lhs, rhs, op } => match op {
             crate::ast::BinOpKind::Add => {
+                let mut local_pops = 0;
                 let idx1 = translate_node(
                     lhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -241,7 +256,7 @@ fn translate_node(
                 let idx2 = translate_node(
                     rhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -250,6 +265,7 @@ fn translate_node(
                 code.push(ByteCode::Add {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
+                    param_pops: local_pops as u8,
                 });
                 *pops += 1;
                 *stack_idx += 1;
@@ -257,10 +273,11 @@ fn translate_node(
                 *stack_idx - 1
             }
             crate::ast::BinOpKind::Sub => {
+                let mut local_pops = 0;
                 let idx1 = translate_node(
                     lhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -269,7 +286,7 @@ fn translate_node(
                 let idx2 = translate_node(
                     rhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -278,6 +295,7 @@ fn translate_node(
                 code.push(ByteCode::Sub {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
+                    param_pops: local_pops as u8,
                 });
                 *pops += 1;
                 *stack_idx += 1;
@@ -285,10 +303,11 @@ fn translate_node(
                 *stack_idx - 1
             }
             crate::ast::BinOpKind::Mul => {
+                let mut local_pops = 0;
                 let idx1 = translate_node(
                     lhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -297,7 +316,7 @@ fn translate_node(
                 let idx2 = translate_node(
                     rhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -306,6 +325,7 @@ fn translate_node(
                 code.push(ByteCode::Mul {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
+                    param_pops: local_pops as u8,
                 });
                 *pops += 1;
                 *stack_idx += 1;
@@ -313,10 +333,11 @@ fn translate_node(
                 *stack_idx - 1
             }
             crate::ast::BinOpKind::Div => {
+                let mut local_pops = 0;
                 let idx1 = translate_node(
                     lhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -325,7 +346,7 @@ fn translate_node(
                 let idx2 = translate_node(
                     rhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -334,6 +355,7 @@ fn translate_node(
                 code.push(ByteCode::Div {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
+                    param_pops: local_pops as u8,
                 });
                 *pops += 1;
                 *stack_idx += 1;
@@ -341,10 +363,11 @@ fn translate_node(
                 *stack_idx - 1
             }
             crate::ast::BinOpKind::Mod => {
+                let mut local_pops = 0;
                 let idx1 = translate_node(
                     lhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -353,7 +376,7 @@ fn translate_node(
                 let idx2 = translate_node(
                     rhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -362,6 +385,7 @@ fn translate_node(
                 code.push(ByteCode::Mod {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
+                    param_pops: local_pops as u8,
                 });
                 *pops += 1;
                 *stack_idx += 1;
@@ -369,10 +393,11 @@ fn translate_node(
                 *stack_idx - 1
             }
             crate::ast::BinOpKind::And => {
+                let mut local_pops = 0;
                 let idx1 = translate_node(
                     lhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -381,7 +406,7 @@ fn translate_node(
                 let idx2 = translate_node(
                     rhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -390,6 +415,7 @@ fn translate_node(
                 code.push(ByteCode::And {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
+                    param_pops: local_pops as u8,
                 });
                 *pops += 1;
                 *stack_idx += 1;
@@ -397,10 +423,11 @@ fn translate_node(
                 *stack_idx - 1
             }
             crate::ast::BinOpKind::Or => {
+                let mut local_pops = 0;
                 let idx1 = translate_node(
                     lhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -409,7 +436,7 @@ fn translate_node(
                 let idx2 = translate_node(
                     rhs,
                     code,
-                    pops,
+                    &mut local_pops,
                     vars,
                     funcs,
                     stack_idx,
@@ -418,6 +445,7 @@ fn translate_node(
                 code.push(ByteCode::Or {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
+                    param_pops: local_pops as u8,
                 });
                 *pops += 1;
                 *stack_idx += 1;
