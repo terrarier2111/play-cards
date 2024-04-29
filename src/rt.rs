@@ -31,6 +31,7 @@ impl RtRef {
 
     #[inline]
     pub fn bool(val: bool) -> Self {
+        println!("ty bits: {}", ((RtType::Bool as u64) | ((val as u8 as u64) << Self::VAL_SHIFT)));
         Self(NanBox64::new_tag(TagBuilder::new_full_tag(unsafe {
             NonZeroU64::new_unchecked(
                 (RtType::Bool as u64) | ((val as u8 as u64) << Self::VAL_SHIFT),
@@ -45,7 +46,12 @@ impl RtRef {
 
     pub fn string(val: Box<String>) -> Self {
         let ptr = Box::into_raw(val);
-        Self(NanBox64::new_tag(TagBuilder::new_full_tag(NonZeroU64::new(((ptr as usize as u64) << Self::VAL_SHIFT) | (RtType::String as u8 as u64)).unwrap())))
+        Self(NanBox64::new_tag(TagBuilder::new_full_tag(
+            NonZeroU64::new(
+                ((ptr as usize as u64) << Self::VAL_SHIFT) | (RtType::String as u8 as u64),
+            )
+            .unwrap(),
+        )))
     }
 
     pub fn get_player(self) -> Option<Player> {
@@ -122,18 +128,27 @@ impl RtRef {
     }
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
+#[repr(i8)]
 pub enum Ordering {
-    Less,
-    Equal,
+    Less = -1,
+    Equal = 0,
+    Greater = 1,
     NotEqual,
-    Greater,
 }
 
-pub struct RtVal<T>(T);
+impl Ordering {
+    pub fn from_std(val: std::cmp::Ordering) -> Self {
+        match val {
+            std::cmp::Ordering::Less => Self::Less,
+            std::cmp::Ordering::Equal => Self::Equal,
+            std::cmp::Ordering::Greater => Self::Greater,
+        }
+    }
+}
 
 // this is inlined into rtref using NaN-boxing
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u64)]
 pub enum RtType {
     Decimal,

@@ -5,7 +5,7 @@ use thin_vec::{thin_vec, ThinVec};
 use crate::{
     ast::AstNode,
     parser::Stmt,
-    rt::{RtRef, RtType},
+    rt::{Ordering, RtRef, RtType},
 };
 
 #[derive(Debug)]
@@ -59,6 +59,11 @@ pub enum ByteCode {
         relative_off: isize,
         /// the condition is stored on the stack at this idx
         arg_idx: UHalf,
+    },
+    Compare {
+        arg1_idx: UHalf,
+        arg2_idx: UHalf,
+        expected: Ordering,
     },
 }
 
@@ -313,260 +318,123 @@ fn translate_node(
 
             *stack_idx - 1
         }
-        AstNode::BinOp { lhs, rhs, op } => match op {
-            crate::ast::BinOpKind::Add => {
-                let mut local_pops = 0;
-                let idx1 = translate_node(
-                    lhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                let idx2 = translate_node(
-                    rhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                code.push(ByteCode::Add {
-                    arg1_idx: idx1 as UHalf,
-                    arg2_idx: idx2 as UHalf,
-                });
-
-                for _ in 0..local_pops {
-                    code.push(ByteCode::Pop { offset: 1 });
+        AstNode::BinOp { lhs, rhs, op } => {
+            let mut local_pops = 0;
+            let idx1 = translate_node(
+                lhs,
+                code,
+                &mut local_pops,
+                vars,
+                funcs,
+                stack_idx,
+                curr_stack_frame_size,
+            );
+            let idx2 = translate_node(
+                rhs,
+                code,
+                &mut local_pops,
+                vars,
+                funcs,
+                stack_idx,
+                curr_stack_frame_size,
+            );
+            match op {
+                crate::ast::BinOpKind::Add => {
+                    code.push(ByteCode::Add {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                    });
                 }
-                *curr_stack_frame_size -= local_pops;
-                *stack_idx -= local_pops;
-
-                *pops += 1;
-                *stack_idx += 1;
-                *curr_stack_frame_size += 1;
-                *stack_idx - 1
-            }
-            crate::ast::BinOpKind::Sub => {
-                let mut local_pops = 0;
-                let idx1 = translate_node(
-                    lhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                let idx2 = translate_node(
-                    rhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                code.push(ByteCode::Sub {
-                    arg1_idx: idx1 as UHalf,
-                    arg2_idx: idx2 as UHalf,
-                });
-                for _ in 0..local_pops {
-                    code.push(ByteCode::Pop { offset: 1 });
+                crate::ast::BinOpKind::Sub => {
+                    code.push(ByteCode::Sub {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                    });
                 }
-                *curr_stack_frame_size -= local_pops;
-                *stack_idx -= local_pops;
-
-                *pops += 1;
-                *stack_idx += 1;
-                *curr_stack_frame_size += 1;
-                *stack_idx - 1
-            }
-            crate::ast::BinOpKind::Mul => {
-                let mut local_pops = 0;
-                let idx1 = translate_node(
-                    lhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                let idx2 = translate_node(
-                    rhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                code.push(ByteCode::Mul {
-                    arg1_idx: idx1 as UHalf,
-                    arg2_idx: idx2 as UHalf,
-                });
-                for _ in 0..local_pops {
-                    code.push(ByteCode::Pop { offset: 1 });
+                crate::ast::BinOpKind::Mul => {
+                    code.push(ByteCode::Mul {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                    });
                 }
-                *curr_stack_frame_size -= local_pops;
-                *stack_idx -= local_pops;
-
-                *pops += 1;
-                *stack_idx += 1;
-                *curr_stack_frame_size += 1;
-                *stack_idx - 1
-            }
-            crate::ast::BinOpKind::Div => {
-                let mut local_pops = 0;
-                let idx1 = translate_node(
-                    lhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                let idx2 = translate_node(
-                    rhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                code.push(ByteCode::Div {
-                    arg1_idx: idx1 as UHalf,
-                    arg2_idx: idx2 as UHalf,
-                });
-                for _ in 0..local_pops {
-                    code.push(ByteCode::Pop { offset: 1 });
+                crate::ast::BinOpKind::Div => {
+                    code.push(ByteCode::Div {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                    });
                 }
-                *curr_stack_frame_size -= local_pops;
-                *stack_idx -= local_pops;
-
-                *pops += 1;
-                *stack_idx += 1;
-                *curr_stack_frame_size += 1;
-                *stack_idx - 1
-            }
-            crate::ast::BinOpKind::Mod => {
-                let mut local_pops = 0;
-                let idx1 = translate_node(
-                    lhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                let idx2 = translate_node(
-                    rhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                code.push(ByteCode::Mod {
-                    arg1_idx: idx1 as UHalf,
-                    arg2_idx: idx2 as UHalf,
-                });
-                for _ in 0..local_pops {
-                    code.push(ByteCode::Pop { offset: 1 });
+                crate::ast::BinOpKind::Mod => {
+                    code.push(ByteCode::Mod {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                    });
                 }
-                *curr_stack_frame_size -= local_pops;
-                *stack_idx -= local_pops;
-
-                *pops += 1;
-                *stack_idx += 1;
-                *curr_stack_frame_size += 1;
-                *stack_idx - 1
-            }
-            crate::ast::BinOpKind::And => {
-                let mut local_pops = 0;
-                let idx1 = translate_node(
-                    lhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                let idx2 = translate_node(
-                    rhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                code.push(ByteCode::And {
-                    arg1_idx: idx1 as UHalf,
-                    arg2_idx: idx2 as UHalf,
-                });
-                for _ in 0..local_pops {
-                    code.push(ByteCode::Pop { offset: 1 });
+                crate::ast::BinOpKind::And => {
+                    code.push(ByteCode::And {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                    });
                 }
-                *curr_stack_frame_size -= local_pops;
-                *stack_idx -= local_pops;
-
-                *pops += 1;
-                *stack_idx += 1;
-                *curr_stack_frame_size += 1;
-                *stack_idx - 1
-            }
-            crate::ast::BinOpKind::Or => {
-                let mut local_pops = 0;
-                let idx1 = translate_node(
-                    lhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                let idx2 = translate_node(
-                    rhs,
-                    code,
-                    &mut local_pops,
-                    vars,
-                    funcs,
-                    stack_idx,
-                    curr_stack_frame_size,
-                );
-                code.push(ByteCode::Or {
-                    arg1_idx: idx1 as UHalf,
-                    arg2_idx: idx2 as UHalf,
-                });
-                for _ in 0..local_pops {
-                    code.push(ByteCode::Pop { offset: 1 });
+                crate::ast::BinOpKind::Or => {
+                    code.push(ByteCode::Or {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                    });
                 }
-                *curr_stack_frame_size -= local_pops;
-                *stack_idx -= local_pops;
-
-                *pops += 1;
-                *stack_idx += 1;
-                *curr_stack_frame_size += 1;
-                *stack_idx - 1
+                crate::ast::BinOpKind::Eq => {
+                    code.push(ByteCode::Compare {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                        expected: Ordering::Equal,
+                    });
+                }
+                crate::ast::BinOpKind::Ne => {
+                    code.push(ByteCode::Compare {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                        expected: Ordering::NotEqual,
+                    });
+                }
+                crate::ast::BinOpKind::Gt => {
+                    code.push(ByteCode::Compare {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                        expected: Ordering::Greater,
+                    });
+                }
+                crate::ast::BinOpKind::Lt => {
+                    code.push(ByteCode::Compare {
+                        arg1_idx: idx1 as UHalf,
+                        arg2_idx: idx2 as UHalf,
+                        expected: Ordering::Less,
+                    });
+                }
+                crate::ast::BinOpKind::Ge => {
+                    code.push(ByteCode::Compare {
+                        arg1_idx: idx2 as UHalf,
+                        arg2_idx: idx1 as UHalf,
+                        expected: Ordering::Less,
+                    });
+                }
+                crate::ast::BinOpKind::Le => {
+                    code.push(ByteCode::Compare {
+                        arg1_idx: idx2 as UHalf,
+                        arg2_idx: idx1 as UHalf,
+                        expected: Ordering::Greater,
+                    });
+                }
             }
-            crate::ast::BinOpKind::Eq => todo!(),
-            crate::ast::BinOpKind::Ne => todo!(),
-            crate::ast::BinOpKind::Gt => todo!(),
-            crate::ast::BinOpKind::Lt => todo!(),
-            crate::ast::BinOpKind::Ge => todo!(),
-            crate::ast::BinOpKind::Le => todo!(),
-        },
+            for _ in 0..local_pops {
+                code.push(ByteCode::Pop { offset: 1 });
+            }
+            *curr_stack_frame_size -= local_pops;
+            *stack_idx -= local_pops;
+
+            *pops += 1;
+            *stack_idx += 1;
+            *curr_stack_frame_size += 1;
+            *stack_idx - 1
+        }
         AstNode::Val(val) => {
             code.push(ByteCode::Push { val: *val });
             *pops += 1;

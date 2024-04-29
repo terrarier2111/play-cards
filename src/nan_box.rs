@@ -136,7 +136,7 @@ impl TagBuilder {
 
     #[inline]
     pub const fn new_full_tag(tag: NonZeroU64) -> Self {
-        Self(tag.get() << 12)
+        Self((tag.get() << 12) | EXP_FIELD_MASK)
     }
 
     #[inline]

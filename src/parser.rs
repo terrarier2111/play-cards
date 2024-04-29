@@ -186,7 +186,11 @@ impl Parser {
         // eat bin_op token
         self.next();
         let rhs = self.try_parse_bin_op()?;
-        Ok(AstNode::BinOp { lhs: Box::new(lhs), rhs: Box::new(rhs), op: bin_op })
+        Ok(AstNode::BinOp {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            op: bin_op,
+        })
     }
 }
 

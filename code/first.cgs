@@ -1,5 +1,9 @@
 //test = 1
 //test2 = 2
 //test3 = test + test2
-a = 5
-res = 3 + a
+res = 3
+if res == 6 {
+    test = 7
+} else {
+    test2 = 14
+}

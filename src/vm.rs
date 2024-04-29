@@ -1,6 +1,6 @@
 use crate::{
     bytecode::{ByteCode, Function},
-    rt::{RtRef, RtType},
+    rt::{Ordering, RtRef, RtType},
 };
 
 pub struct Vm {
@@ -27,10 +27,15 @@ impl Vm {
                     self.stack.push(*val); // FIXME: if this val has a backing allocation, clone it or use reference counters.
                 }
                 ByteCode::Pop { offset } => {
+                    for (idx, val) in self.stack.iter().enumerate() {
+                        println!("idx {} | {:?}: {:?}", idx, val.ty(), val.get_decimal());
+                    }
                     // FIXME: cleanup backing storage if necessary or reduce reference counter
                     let val = self.stack.remove(self.stack.len() - 1 - *offset as usize);
                     if let Some(val) = val.get_decimal() {
                         println!("popped val {:?}", val);
+                    } else {
+                        println!("popped other {:?}", val.ty());
                     }
                 }
                 ByteCode::Call {
@@ -114,12 +119,41 @@ impl Vm {
                 } => {
                     let val = *self.stack.get(*arg_idx as usize).unwrap(); // FIXME: guard against inval param
                     if val.ty() != RtType::Bool {
-                        panic!("invalid type"); // FIXME: auto convert to bool if possible
+                        panic!("invalid type {:?} {:?}", val.ty(), val.get_decimal()); // FIXME: auto convert to bool if possible
                     }
                     if val == RtRef::bool(true) {
                         self.ip = ((self.ip as isize) + *relative_off) as usize; // FIXME: guard against overflow!
                         continue;
                     }
+                }
+                ByteCode::Compare {
+                    arg1_idx,
+                    arg2_idx,
+                    expected,
+                } => {
+                    let left = *self.stack.get(*arg1_idx as usize).unwrap();
+                    let right = *self.stack.get(*arg2_idx as usize).unwrap();
+                    // FIXME: add implicit conversion
+                    assert!(left.ty() == right.ty());
+                    let cmp = match left.ty() {
+                        RtType::Decimal => Ordering::from_std(unsafe {
+                            left.get_decimal_directly()
+                                .total_cmp(&right.get_decimal_directly())
+                        }),
+                        RtType::None => Ordering::Equal,
+                        RtType::Bool => {
+                            if left == right {
+                                Ordering::Equal
+                            } else {
+                                Ordering::NotEqual
+                            }
+                        }
+                        RtType::String => todo!(),
+                        RtType::Player => todo!(),
+                        RtType::Inventory => todo!(),
+                        RtType::Cards => todo!(),
+                    };
+                    self.stack.push(RtRef::bool(*expected == cmp));
                 }
             }
             self.ip += 1;
