@@ -28,7 +28,10 @@ impl Vm {
                 }
                 ByteCode::Pop { offset } => {
                     // FIXME: cleanup backing storage if necessary or reduce reference counter
-                    let _val = self.stack.remove(self.stack.len() - 1 - *offset as usize);
+                    let val = self.stack.remove(self.stack.len() - 1 - *offset as usize);
+                    if let Some(val) = val.get_decimal() {
+                        println!("popped val {:?}", val);
+                    }
                 }
                 ByteCode::Call {
                     fn_idx,

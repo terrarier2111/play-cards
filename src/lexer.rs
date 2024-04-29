@@ -230,7 +230,7 @@ impl Token {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TokenKind {
     Comma,      // `,`
     Assign,     // `=`

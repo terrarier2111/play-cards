@@ -143,7 +143,7 @@ impl Parser {
                 Token::CharSeq(val) => AstNode::Val(RtRef::string(Box::new(val))),
                 Token::Number(val) => AstNode::Val(RtRef::decimal(val)),
                 Token::Bool(val) => AstNode::Val(RtRef::bool(val)),
-                _ => unreachable!(),
+                token => unreachable!("found unexpected token {:?}", token),
             },
             None => unreachable!(),
         };
@@ -181,8 +181,10 @@ impl Parser {
             TokenKind::Mod => BinOpKind::Mod,
             TokenKind::Add => BinOpKind::Add,
             TokenKind::Sub => BinOpKind::Sub,
-            _ => unreachable!(),
+            token => unreachable!("found unexpected token {:?}", token),
         };
+        // eat bin_op token
+        self.next();
         let rhs = self.try_parse_bin_op()?;
         Ok(AstNode::BinOp { lhs: Box::new(lhs), rhs: Box::new(rhs), op: bin_op })
     }
