@@ -59,7 +59,7 @@ pub enum AstNode {
     },
     UnaryOp {
         val: Box<AstNode>,
-        op: UnaryOpKind,  
+        op: UnaryOpKind,
     },
     BinOp {
         lhs: Box<AstNode>,

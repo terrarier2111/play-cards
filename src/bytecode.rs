@@ -13,11 +13,11 @@ pub enum ByteCode {
     Push {
         val: RtRef,
     },
-    Pop { 
+    Pop {
         /// the offset describes how many value should be skipped starting from the most recent element
         /// when looking for an element to pop from the stack
         offset: u8, // offsets other than 0 and 1 are unsupported
-     },
+    },
     Call {
         fn_idx: u8,
         push_val: bool,
@@ -86,7 +86,9 @@ pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
     let mut vars = HashMap::new();
     let mut stack_idx = 0;
     // used in jump conditional code to reverse the condition (this is pretty hacky but works and is fast)
-    code.push(ByteCode::Push { val: RtRef::bool(true) });
+    code.push(ByteCode::Push {
+        val: RtRef::bool(true),
+    });
     translate_internal(stmts, fns, &mut stack_idx, &mut vars, &mut code);
     code.push(ByteCode::Pop { offset: 0 });
     code
@@ -107,7 +109,15 @@ fn translate_internal(
         match stmt {
             Stmt::DefineVar { name, val } => {
                 let mut _pops = 0;
-                let var_idx = translate_node(val, code, &mut _pops, vars, fns, stack_idx, &mut curr_scope.stack_size);
+                let var_idx = translate_node(
+                    val,
+                    code,
+                    &mut _pops,
+                    vars,
+                    fns,
+                    stack_idx,
+                    &mut curr_scope.stack_size,
+                );
                 curr_scope.vars.push(name.clone());
                 vars.insert(name.clone(), var_idx);
             }
@@ -149,7 +159,15 @@ fn translate_internal(
                 let loop_start_len = code.len();
                 let mut pops = 0;
                 // this is the argument for the condition which decides whether to continue with the loop
-                let arg_idx = translate_node(&condition, code, &mut pops, vars, fns, stack_idx, &mut curr_scope.stack_size);
+                let arg_idx = translate_node(
+                    &condition,
+                    code,
+                    &mut pops,
+                    vars,
+                    fns,
+                    stack_idx,
+                    &mut curr_scope.stack_size,
+                );
 
                 let prev_len = code.len();
                 translate(stmts, fns);
@@ -158,17 +176,31 @@ fn translate_internal(
                 // this includes the normal body size and all the additional code we generated for loop maintenance
                 // the + 1 if from the unconditional Jump we use to go back to the condition at the end of the loop
                 let full_body_size = body_size + pops + 1;
-                
+
                 // take the inverse of the condition
-                code.insert(prev_len, ByteCode::Sub { arg1_idx: TRUE_IDX as UHalf, arg2_idx: arg_idx as UHalf });
+                code.insert(
+                    prev_len,
+                    ByteCode::Sub {
+                        arg1_idx: TRUE_IDX as UHalf,
+                        arg2_idx: arg_idx as UHalf,
+                    },
+                );
                 // skip the body if the inverse condition turns out to be true
-                code.insert(prev_len + 1, ByteCode::JumpCond { relative_off: full_body_size as isize, arg_idx: arg_idx as UHalf });
+                code.insert(
+                    prev_len + 1,
+                    ByteCode::JumpCond {
+                        relative_off: full_body_size as isize,
+                        arg_idx: arg_idx as UHalf,
+                    },
+                );
                 // cleanup for when we enter the loop
                 for i in 0..pops {
                     code.insert(prev_len + 2 + i, ByteCode::Pop { offset: 0 });
                 }
                 // go back to the beginning of the loop and retest its condition
-                code.push(ByteCode::Jump { relative_off: -((code.len() - loop_start_len) as isize) });
+                code.push(ByteCode::Jump {
+                    relative_off: -((code.len() - loop_start_len) as isize),
+                });
                 // cleanup for when we exit the loop
                 for _ in 0..pops {
                     code.push(ByteCode::Pop { offset: 0 });
@@ -178,9 +210,17 @@ fn translate_internal(
                 let mut jump_indices = vec![];
                 for (cond, stmts) in seq.iter() {
                     let mut pops = 0;
-                    let cond_val_idx = translate_node(&cond, code, &mut pops, vars, fns, stack_idx, &mut curr_scope.stack_size);
+                    let cond_val_idx = translate_node(
+                        &cond,
+                        code,
+                        &mut pops,
+                        vars,
+                        fns,
+                        stack_idx,
+                        &mut curr_scope.stack_size,
+                    );
                     let cond_idx = code.len();
-                    
+
                     let prev_code_size = code.len();
                     // cleanup condition data, if taken
                     for _ in 0..pops {
@@ -188,7 +228,13 @@ fn translate_internal(
                     }
                     translate_internal(stmts, fns, stack_idx, vars, code);
                     let code_size = code.len() - prev_code_size;
-                    code.insert(cond_idx, ByteCode::JumpCond { relative_off: code_size as isize, arg_idx: cond_val_idx as UHalf });
+                    code.insert(
+                        cond_idx,
+                        ByteCode::JumpCond {
+                            relative_off: code_size as isize,
+                            arg_idx: cond_val_idx as UHalf,
+                        },
+                    );
                     // here, a unconditional jump to the end of the if statement will be inserted to skip any other conditional checks
                     // which ensures we are only ever taking a single path, not 2 or more
                     jump_indices.push(code.len());
@@ -203,7 +249,9 @@ fn translate_internal(
                 for idx in jump_indices.iter().rev() {
                     let end = code.len();
                     let off = end - *idx;
-                    code.push(ByteCode::Jump { relative_off: off as isize });
+                    code.push(ByteCode::Jump {
+                        relative_off: off as isize,
+                    });
                 }
             }
         }
@@ -526,11 +574,9 @@ fn translate_node(
             *stack_idx - 1
         }
         AstNode::Var { name } => *vars.get(name).unwrap(),
-        AstNode::UnaryOp { val, op } => {
-            match *op {
-                crate::ast::UnaryOpKind::Not => {
-                    todo!()
-                },
+        AstNode::UnaryOp { val, op } => match *op {
+            crate::ast::UnaryOpKind::Not => {
+                todo!()
             }
         },
     }

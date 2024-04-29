@@ -75,7 +75,10 @@ impl Parser {
             break;
         }
 
-        Ok(Stmt::Conditional { seq: conditions, fallback: fallback.unwrap_or(vec![]) })
+        Ok(Stmt::Conditional {
+            seq: conditions,
+            fallback: fallback.unwrap_or(vec![]),
+        })
     }
 
     fn parse_stmt(&mut self) -> anyhow::Result<Stmt> {
@@ -122,24 +125,40 @@ impl Parser {
     fn try_parse_bin_op(&mut self) -> anyhow::Result<AstNode> {
         let lhs = match self.next() {
             Some(token) => match token {
-                Token::Exclam => return Ok(AstNode::UnaryOp { val: Box::new(self.try_parse_bin_op()?), op: UnaryOpKind::Not }),
+                Token::Exclam => {
+                    return Ok(AstNode::UnaryOp {
+                        val: Box::new(self.try_parse_bin_op()?),
+                        op: UnaryOpKind::Not,
+                    })
+                }
                 Token::OpenBrace => {
                     let op = self.try_parse_bin_op()?;
                     if !self.try_eat(TokenKind::CloseBrace) {
                         panic!("Can't find closing brace");
                     }
                     op
-                },
+                }
                 Token::OpenCurly => todo!(),
                 Token::Lit(val) => AstNode::Var { name: val },
-                Token::CharSeq(_) => AstNode::Val(RtRef::),
+                Token::CharSeq(val) => AstNode::Val(RtRef::string(Box::new(val))),
                 Token::Number(val) => AstNode::Val(RtRef::decimal(val)),
                 Token::Bool(val) => AstNode::Val(RtRef::bool(val)),
                 _ => unreachable!(),
             },
             None => unreachable!(),
         };
-        if matches!(self.look_ahead().map(|token| token.kind()), Some(TokenKind::Add | TokenKind::Sub | TokenKind::And | TokenKind::Div | TokenKind::Mul | TokenKind::Mod | TokenKind::Or)) {
+        if matches!(
+            self.look_ahead().map(|token| token.kind()),
+            Some(
+                TokenKind::Add
+                    | TokenKind::Sub
+                    | TokenKind::And
+                    | TokenKind::Div
+                    | TokenKind::Mul
+                    | TokenKind::Mod
+                    | TokenKind::Or
+            )
+        ) {
             match self.look_ahead().unwrap().kind() {
                 TokenKind::Comma => todo!(),
                 TokenKind::Semi => todo!(),
