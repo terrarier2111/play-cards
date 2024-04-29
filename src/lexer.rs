@@ -13,9 +13,11 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
     let mut next_chr = iter.next();
     while let Some(chr) = next_chr {
         if chr == ' ' || chr == '\r' || chr == '\n' {
+            next_chr = iter.next();
             continue;
         }
         if chr.is_numeric() {
+            buffer.push(chr);
             let mut dot = false;
             collect_string_until(
                 &mut iter,
@@ -31,17 +33,20 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
                 },
                 &mut buffer,
             );
+            next_chr = iter.next();
             tokens.push(Token::Number(
                 core::mem::take(&mut buffer).parse::<f64>().unwrap(),
             ));
             continue;
         }
         if chr.is_alphabetic() {
+            buffer.push(chr);
             collect_string_until(
                 &mut iter,
                 |chr| !(chr.is_alphanumeric() || chr == '_'),
                 &mut buffer,
             );
+            next_chr = iter.next();
             let lit = core::mem::take(&mut buffer);
             let token = match lit.as_str() {
                 "while" => Token::While,
@@ -54,6 +59,7 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
         }
         if chr == '"' {
             collect_string_until(&mut iter, |chr| chr == '"', &mut buffer);
+            next_chr = iter.next();
             tokens.push(Token::CharSeq(core::mem::take(&mut buffer)));
             continue;
         }

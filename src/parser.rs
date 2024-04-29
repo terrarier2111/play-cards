@@ -1,5 +1,5 @@
 use crate::{
-    ast::{AstNode, UnaryOpKind},
+    ast::{AstNode, BinOpKind, UnaryOpKind},
     lexer::{Token, TokenKind},
     rt::RtRef,
 };
@@ -147,7 +147,7 @@ impl Parser {
             },
             None => unreachable!(),
         };
-        if matches!(
+        if !matches!(
             self.look_ahead().map(|token| token.kind()),
             Some(
                 TokenKind::Add
@@ -157,40 +157,34 @@ impl Parser {
                     | TokenKind::Mul
                     | TokenKind::Mod
                     | TokenKind::Or
+                    | TokenKind::Eq
+                    | TokenKind::Ne
+                    | TokenKind::Gt
+                    | TokenKind::Ge
+                    | TokenKind::Lt
+                    | TokenKind::Le
             )
         ) {
-            match self.look_ahead().unwrap().kind() {
-                TokenKind::Comma => todo!(),
-                TokenKind::Semi => todo!(),
-                TokenKind::Assign => todo!(),
-                TokenKind::Eq => todo!(),
-                TokenKind::Ne => todo!(),
-                TokenKind::Gt => todo!(),
-                TokenKind::Lt => todo!(),
-                TokenKind::Ge => todo!(),
-                TokenKind::Le => todo!(),
-                TokenKind::Exclam => todo!(),
-                TokenKind::And => todo!(),
-                TokenKind::Or => todo!(),
-                TokenKind::Div => todo!(),
-                TokenKind::Mul => todo!(),
-                TokenKind::Mod => todo!(),
-                TokenKind::Add => todo!(),
-                TokenKind::Sub => todo!(),
-                TokenKind::OpenBrace => todo!(),
-                TokenKind::CloseBrace => todo!(),
-                TokenKind::OpenCurly => todo!(),
-                TokenKind::CloseCurly => todo!(),
-                TokenKind::While => todo!(),
-                TokenKind::If => todo!(),
-                TokenKind::Else => todo!(),
-                TokenKind::Lit => todo!(),
-                TokenKind::CharSeq => todo!(),
-                TokenKind::Number => todo!(),
-                TokenKind::Bool => todo!(),
-            }
+            return Ok(lhs);
         }
-        todo!()
+        let bin_op = match self.look_ahead().unwrap().kind() {
+            TokenKind::Eq => BinOpKind::Eq,
+            TokenKind::Ne => BinOpKind::Ne,
+            TokenKind::Gt => BinOpKind::Gt,
+            TokenKind::Lt => BinOpKind::Lt,
+            TokenKind::Ge => BinOpKind::Ge,
+            TokenKind::Le => BinOpKind::Le,
+            TokenKind::And => BinOpKind::And,
+            TokenKind::Or => BinOpKind::Or,
+            TokenKind::Div => BinOpKind::Div,
+            TokenKind::Mul => BinOpKind::Mul,
+            TokenKind::Mod => BinOpKind::Mod,
+            TokenKind::Add => BinOpKind::Add,
+            TokenKind::Sub => BinOpKind::Sub,
+            _ => unreachable!(),
+        };
+        let rhs = self.try_parse_bin_op()?;
+        Ok(AstNode::BinOp { lhs: Box::new(lhs), rhs: Box::new(rhs), op: bin_op })
     }
 }
 

@@ -1,7 +1,4 @@
-use std::{boxed::ThinBox, mem::transmute, num::NonZeroU64};
-
-use thin_string::ThinString;
-use thin_vec::ThinVec;
+use std::{mem::transmute, num::NonZeroU64};
 
 use crate::nan_box::{NanBox64, TagBuilder};
 
@@ -108,7 +105,7 @@ impl RtRef {
     }
 
     pub(crate) unsafe fn get_string_directly(&self) -> &String {
-        unsafe { &*self.dst().cast::<ThinString>() }
+        unsafe { &*self.dst().cast::<String>() }
     }
 
     pub fn get_string(&self) -> Option<&String> {
