@@ -71,7 +71,7 @@ pub type UHalf = u8;
 pub struct Function {
     pub params: &'static [RtType],
     pub name: String,
-    pub call: Box<dyn FnMut(&mut Vec<RtRef>) -> Option<RtRef>>,
+    pub call: Box<dyn FnMut(Vec<RtRef>) -> Option<RtRef>>,
 }
 
 struct Scope {
