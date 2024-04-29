@@ -8,62 +8,48 @@ use crate::{
     rt::{RtRef, RtType},
 };
 
-// FIXME: get rid of param_pops somehow (if possible)
-
 #[repr(u8)]
 pub enum ByteCode {
     Push {
         val: RtRef,
     },
-    Pop,
+    Pop { 
+        /// the offset describes how many value should be skipped starting from the most recent element
+        /// when looking for an element to pop from the stack
+        offset: u8, // offsets other than 0 and 1 are unsupported
+     },
     Call {
         fn_idx: u8,
         push_val: bool,
         arg_indices: ThinVec<UHalf>,
-        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
-        param_pops: u8,
     },
     Add {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
-        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
-        param_pops: u8,
     },
     Sub {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
-        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
-        param_pops: u8,
     },
     Mul {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
-        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
-        param_pops: u8,
     },
     Div {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
-        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
-        param_pops: u8,
     },
     Mod {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
-        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
-        param_pops: u8,
     },
     And {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
-        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
-        param_pops: u8,
     },
     Or {
         arg1_idx: UHalf,
         arg2_idx: UHalf,
-        /// we have to pass the pops here and perform it inside the call as we have to push the call's result right after popping the params
-        param_pops: u8,
     },
     Jump {
         relative_off: isize,
@@ -102,7 +88,7 @@ pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
     // used in jump conditional code to reverse the condition (this is pretty hacky but works and is fast)
     code.push(ByteCode::Push { val: RtRef::bool(true) });
     translate_internal(stmts, fns, &mut stack_idx, &mut vars, &mut code);
-    code.push(ByteCode::Pop);
+    code.push(ByteCode::Pop { offset: 0 });
     code
 }
 
@@ -150,8 +136,10 @@ fn translate_internal(
                     fn_idx: fn_idx as u8,
                     push_val: false,
                     arg_indices: indices,
-                    param_pops: pops as u8,
                 });
+                for _ in 0..pops {
+                    code.push(ByteCode::Pop { offset: 1 });
+                }
                 curr_scope.stack_size -= pops;
                 *stack_idx -= pops;
             }
@@ -170,18 +158,18 @@ fn translate_internal(
                 let full_body_size = body_size + pops + 1;
                 
                 // take the inverse of the condition
-                code.insert(prev_len, ByteCode::Sub { arg1_idx: TRUE_IDX as UHalf, arg2_idx: arg_idx as UHalf, param_pops: 0 });
+                code.insert(prev_len, ByteCode::Sub { arg1_idx: TRUE_IDX as UHalf, arg2_idx: arg_idx as UHalf });
                 // skip the body if the inverse condition turns out to be true
                 code.insert(prev_len + 1, ByteCode::JumpCond { relative_off: body_size as isize, arg_idx: arg_idx as UHalf });
                 // cleanup for when we enter the loop
                 for i in 0..pops {
-                    code.insert(prev_len + 2 + i, ByteCode::Pop);
+                    code.insert(prev_len + 2 + i, ByteCode::Pop { offset: 0 });
                 }
                 // go back to the beginning of the loop and retest its condition
                 code.push(ByteCode::Jump { relative_off: -((code.len() - loop_start_len) as isize) });
                 // cleanup for when we exit the loop
                 for i in 0..pops {
-                    code.push(ByteCode::Pop);
+                    code.push(ByteCode::Pop { offset: 0 });
                 }
             }
             Stmt::Conditional { seq, fallback } => {
@@ -194,7 +182,7 @@ fn translate_internal(
         vars.remove(&var);
     }
     for _ in 0..curr_scope.stack_size {
-        code.push(ByteCode::Pop);
+        code.push(ByteCode::Pop { offset: 0 });
     }
 }
 
@@ -229,9 +217,13 @@ fn translate_node(
             code.push(ByteCode::Call {
                 fn_idx: func_idx as u8,
                 push_val: true,
-                param_pops: call_pops as u8,
                 arg_indices: indices,
             }); // FIXME: should we push val?
+
+            for _ in 0..call_pops {
+                code.push(ByteCode::Pop { offset: 1 });
+            }
+
             *pops += 1;
             *stack_idx += 1;
             *curr_stack_frame_size += 1;
@@ -265,8 +257,14 @@ fn translate_node(
                 code.push(ByteCode::Add {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
-                    param_pops: local_pops as u8,
                 });
+
+                for _ in 0..local_pops {
+                    code.push(ByteCode::Pop { offset: 1 });
+                }
+                *curr_stack_frame_size -= local_pops;
+                *stack_idx -= local_pops;
+
                 *pops += 1;
                 *stack_idx += 1;
                 *curr_stack_frame_size += 1;
@@ -295,8 +293,13 @@ fn translate_node(
                 code.push(ByteCode::Sub {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
-                    param_pops: local_pops as u8,
                 });
+                for _ in 0..local_pops {
+                    code.push(ByteCode::Pop { offset: 1 });
+                }
+                *curr_stack_frame_size -= local_pops;
+                *stack_idx -= local_pops;
+
                 *pops += 1;
                 *stack_idx += 1;
                 *curr_stack_frame_size += 1;
@@ -325,8 +328,13 @@ fn translate_node(
                 code.push(ByteCode::Mul {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
-                    param_pops: local_pops as u8,
                 });
+                for _ in 0..local_pops {
+                    code.push(ByteCode::Pop { offset: 1 });
+                }
+                *curr_stack_frame_size -= local_pops;
+                *stack_idx -= local_pops;
+
                 *pops += 1;
                 *stack_idx += 1;
                 *curr_stack_frame_size += 1;
@@ -355,8 +363,13 @@ fn translate_node(
                 code.push(ByteCode::Div {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
-                    param_pops: local_pops as u8,
                 });
+                for _ in 0..local_pops {
+                    code.push(ByteCode::Pop { offset: 1 });
+                }
+                *curr_stack_frame_size -= local_pops;
+                *stack_idx -= local_pops;
+
                 *pops += 1;
                 *stack_idx += 1;
                 *curr_stack_frame_size += 1;
@@ -385,8 +398,13 @@ fn translate_node(
                 code.push(ByteCode::Mod {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
-                    param_pops: local_pops as u8,
                 });
+                for _ in 0..local_pops {
+                    code.push(ByteCode::Pop { offset: 1 });
+                }
+                *curr_stack_frame_size -= local_pops;
+                *stack_idx -= local_pops;
+
                 *pops += 1;
                 *stack_idx += 1;
                 *curr_stack_frame_size += 1;
@@ -415,8 +433,13 @@ fn translate_node(
                 code.push(ByteCode::And {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
-                    param_pops: local_pops as u8,
                 });
+                for _ in 0..local_pops {
+                    code.push(ByteCode::Pop { offset: 1 });
+                }
+                *curr_stack_frame_size -= local_pops;
+                *stack_idx -= local_pops;
+
                 *pops += 1;
                 *stack_idx += 1;
                 *curr_stack_frame_size += 1;
@@ -445,8 +468,13 @@ fn translate_node(
                 code.push(ByteCode::Or {
                     arg1_idx: idx1 as UHalf,
                     arg2_idx: idx2 as UHalf,
-                    param_pops: local_pops as u8,
                 });
+                for _ in 0..local_pops {
+                    code.push(ByteCode::Pop { offset: 1 });
+                }
+                *curr_stack_frame_size -= local_pops;
+                *stack_idx -= local_pops;
+
                 *pops += 1;
                 *stack_idx += 1;
                 *curr_stack_frame_size += 1;
