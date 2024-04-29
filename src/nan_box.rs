@@ -42,6 +42,13 @@ impl NanBox64 {
     }
 }
 
+impl PartialEq for NanBox64 {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { self.tagged == other.tagged }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct Tag(u64);
 

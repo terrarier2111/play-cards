@@ -42,11 +42,43 @@ impl Parser {
         })
     }
 
+    fn parse_if(&mut self) -> anyhow::Result<Stmt> {
+        let mut conditions = vec![];
+        let mut fallback = None;
+        loop {
+            let cond = self.parse_node()?;
+            if !self.try_eat(TokenKind::OpenCurly) {
+                panic!("Error parsing if");
+            }
+            let mut stmts = vec![];
+            while !self.try_eat(TokenKind::CloseCurly) {
+                stmts.push(self.parse_stmt()?);
+            }
+            conditions.push((cond, stmts));
+            if self.try_eat(TokenKind::Else) {
+                if self.try_eat(TokenKind::If) {
+                    continue;
+                }
+                if !self.try_eat(TokenKind::OpenCurly) {
+                    panic!("Error parsing else");
+                }
+                let mut stmts = vec![];
+                while !self.try_eat(TokenKind::CloseCurly) {
+                    stmts.push(self.parse_stmt()?);
+                }
+                fallback = Some(stmts);
+            }
+            break;
+        }
+
+        Ok(Stmt::Conditional { seq: conditions, fallback: fallback.unwrap_or(vec![]) })
+    }
+
     fn parse_stmt(&mut self) -> anyhow::Result<Stmt> {
         match self.next().unwrap() {
             Token::OpenCurly => todo!(),
             Token::While => self.parse_loop(),
-            Token::If => todo!(),
+            Token::If => self.parse_if(),
             Token::Lit(var) => {
                 match self.next() {
                     Some(Token::OpenBrace) => {
@@ -89,8 +121,6 @@ impl Parser {
                 Token::Exclam => todo!(),
                 Token::OpenBrace => todo!(),
                 Token::OpenCurly => todo!(),
-                Token::While => todo!(),
-                Token::If => todo!(),
                 Token::Lit(_) => todo!(),
                 Token::CharSeq(_) => todo!(),
                 Token::Number(_) => todo!(),
