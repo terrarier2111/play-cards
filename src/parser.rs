@@ -199,7 +199,7 @@ pub fn parse(tokens: Vec<Token>) -> anyhow::Result<Vec<Stmt>> {
     Ok(stmts)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Stmt {
     DefineVar {
         name: String,

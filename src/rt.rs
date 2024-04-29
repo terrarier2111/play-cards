@@ -1,9 +1,15 @@
-use std::{mem::transmute, num::NonZeroU64};
+use std::{fmt::Debug, mem::transmute, num::NonZeroU64};
 
 use crate::nan_box::{NanBox64, TagBuilder};
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct RtRef(NanBox64);
+
+impl Debug for RtRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RtRef").finish() // FIXME: implement this properly
+    }
+}
 
 impl RtRef {
     const TY_MASK: u64 = (1 << 3) - 1;

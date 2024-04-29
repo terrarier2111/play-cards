@@ -8,6 +8,7 @@ use crate::{
     rt::{RtRef, RtType},
 };
 
+#[derive(Debug)]
 #[repr(u8)]
 pub enum ByteCode {
     Push {
@@ -84,7 +85,7 @@ const TRUE_IDX: usize = 0;
 pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
     let mut code = vec![];
     let mut vars = HashMap::new();
-    let mut stack_idx = 0;
+    let mut stack_idx = 1;
     // used in jump conditional code to reverse the condition (this is pretty hacky but works and is fast)
     code.push(ByteCode::Push {
         val: RtRef::bool(true),

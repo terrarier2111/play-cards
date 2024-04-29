@@ -51,7 +51,7 @@ pub enum PlayerSrc {
     // All,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum AstNode {
     CallFunc {
         name: String,
@@ -72,7 +72,7 @@ pub enum AstNode {
     },
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum BinOpKind {
     Add,
     Sub,
@@ -89,7 +89,7 @@ pub enum BinOpKind {
     Le, // LessEqual
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum UnaryOpKind {
     Not,
 }
