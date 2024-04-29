@@ -12,6 +12,9 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
     let mut iter = src.chars();
     let mut next_chr = iter.next();
     while let Some(chr) = next_chr {
+        if chr == ' ' || chr == '\r' || chr == '\n' {
+            continue;
+        }
         if chr.is_numeric() {
             let mut dot = false;
             collect_string_until(
@@ -61,6 +64,30 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
             '(' => Token::OpenBrace,
             ')' => Token::CloseBrace,
             ',' => Token::Comma,
+            '!' => Token::Exclam,
+            '+' => Token::Add,
+            '-' => Token::Sub,
+            '*' => Token::Mul,
+            '%' => Token::Mod,
+            '/' => {
+                next_chr = iter.next();
+                match next_chr {
+                    Some('/') => {
+                        // skip comments
+                        loop {
+                            next_chr = iter.next();
+                            if next_chr == Some('\n') || next_chr.is_none() {
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+                    _ => {
+                        has_next = true;
+                        Token::Div
+                    }
+                }
+            }
             '=' => {
                 next_chr = iter.next();
                 match next_chr {
@@ -135,7 +162,6 @@ fn collect_string_until<F: FnMut(char) -> bool>(
 #[derive(Clone, PartialEq, Debug)]
 pub enum Token {
     Comma,  // ,
-    Semi,   // ;
     Assign, // =
     Eq,     // Equals
     Ne,     // NotEquals
@@ -168,7 +194,6 @@ impl Token {
     pub fn kind(&self) -> TokenKind {
         match self {
             Token::Comma => TokenKind::Comma,
-            Token::Semi => TokenKind::Semi,
             Token::Assign => TokenKind::Assign,
             Token::OpenBrace => TokenKind::OpenBrace,
             Token::CloseBrace => TokenKind::CloseBrace,
@@ -202,7 +227,6 @@ impl Token {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     Comma,      // `,`
-    Semi,       // `;`
     Assign,     // `=`
     Eq,         // Equals `==`
     Ne,         // NotEquals `!=`
