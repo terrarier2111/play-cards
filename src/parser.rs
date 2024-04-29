@@ -1,5 +1,5 @@
 use crate::{
-    ast::AstNode,
+    ast::{AstNode, UnaryOpKind},
     lexer::{Token, TokenKind},
     rt::RtRef,
 };
@@ -15,6 +15,10 @@ impl Parser {
         self.tokens.get(self.idx - 1).cloned()
     }
 
+    fn look_ahead(&self) -> Option<Token> {
+        self.tokens.get(self.idx).cloned()
+    }
+
     fn try_eat(&mut self, token_kind: TokenKind) -> bool {
         let ret = self
             .tokens
@@ -28,7 +32,7 @@ impl Parser {
     }
 
     fn parse_loop(&mut self) -> anyhow::Result<Stmt> {
-        let cond = self.parse_node()?;
+        let cond = self.try_parse_bin_op()?;
         if !self.try_eat(TokenKind::OpenCurly) {
             panic!("Error parsing loop");
         }
@@ -46,7 +50,7 @@ impl Parser {
         let mut conditions = vec![];
         let mut fallback = None;
         loop {
-            let cond = self.parse_node()?;
+            let cond = self.try_parse_bin_op()?;
             if !self.try_eat(TokenKind::OpenCurly) {
                 panic!("Error parsing if");
             }
@@ -88,7 +92,7 @@ impl Parser {
                             if self.try_eat(TokenKind::CloseBrace) {
                                 break;
                             }
-                            params.push(self.parse_node()?);
+                            params.push(self.try_parse_bin_op()?);
                             if !self.try_eat(TokenKind::Comma) {
                                 if self.try_eat(TokenKind::CloseBrace) {
                                     break;
@@ -105,7 +109,7 @@ impl Parser {
                         // parse variable definition
                         Ok(Stmt::DefineVar {
                             name: var,
-                            val: self.parse_node()?,
+                            val: self.try_parse_bin_op()?,
                         })
                     }
                     _ => panic!("Can't parse var or func"),
@@ -115,20 +119,59 @@ impl Parser {
         }
     }
 
-    fn parse_node(&mut self) -> anyhow::Result<AstNode> {
-        match self.next() {
+    fn try_parse_bin_op(&mut self) -> anyhow::Result<AstNode> {
+        let lhs = match self.next() {
             Some(token) => match token {
-                Token::Exclam => todo!(),
-                Token::OpenBrace => todo!(),
+                Token::Exclam => return Ok(AstNode::UnaryOp { val: Box::new(self.try_parse_bin_op()?), op: UnaryOpKind::Not }),
+                Token::OpenBrace => {
+                    let op = self.try_parse_bin_op()?;
+                    if !self.try_eat(TokenKind::CloseBrace) {
+                        panic!("Can't find closing brace");
+                    }
+                    op
+                },
                 Token::OpenCurly => todo!(),
-                Token::Lit(_) => todo!(),
-                Token::CharSeq(_) => todo!(),
-                Token::Number(_) => todo!(),
-                Token::Bool(_) => todo!(),
+                Token::Lit(val) => AstNode::Var { name: val },
+                Token::CharSeq(_) => AstNode::Val(RtRef::),
+                Token::Number(val) => AstNode::Val(RtRef::decimal(val)),
+                Token::Bool(val) => AstNode::Val(RtRef::bool(val)),
                 _ => unreachable!(),
             },
             None => unreachable!(),
+        };
+        if matches!(self.look_ahead().map(|token| token.kind()), Some(TokenKind::Add | TokenKind::Sub | TokenKind::And | TokenKind::Div | TokenKind::Mul | TokenKind::Mod | TokenKind::Or)) {
+            match self.look_ahead().unwrap().kind() {
+                TokenKind::Comma => todo!(),
+                TokenKind::Semi => todo!(),
+                TokenKind::Assign => todo!(),
+                TokenKind::Eq => todo!(),
+                TokenKind::Ne => todo!(),
+                TokenKind::Gt => todo!(),
+                TokenKind::Lt => todo!(),
+                TokenKind::Ge => todo!(),
+                TokenKind::Le => todo!(),
+                TokenKind::Exclam => todo!(),
+                TokenKind::And => todo!(),
+                TokenKind::Or => todo!(),
+                TokenKind::Div => todo!(),
+                TokenKind::Mul => todo!(),
+                TokenKind::Mod => todo!(),
+                TokenKind::Add => todo!(),
+                TokenKind::Sub => todo!(),
+                TokenKind::OpenBrace => todo!(),
+                TokenKind::CloseBrace => todo!(),
+                TokenKind::OpenCurly => todo!(),
+                TokenKind::CloseCurly => todo!(),
+                TokenKind::While => todo!(),
+                TokenKind::If => todo!(),
+                TokenKind::Else => todo!(),
+                TokenKind::Lit => todo!(),
+                TokenKind::CharSeq => todo!(),
+                TokenKind::Number => todo!(),
+                TokenKind::Bool => todo!(),
+            }
         }
+        todo!()
     }
 }
 

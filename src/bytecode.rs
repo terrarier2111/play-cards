@@ -526,6 +526,13 @@ fn translate_node(
             *stack_idx - 1
         }
         AstNode::Var { name } => *vars.get(name).unwrap(),
+        AstNode::UnaryOp { val, op } => {
+            match *op {
+                crate::ast::UnaryOpKind::Not => {
+                    todo!()
+                },
+            }
+        },
     }
 }
 

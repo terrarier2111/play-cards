@@ -563,6 +563,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "thin-string",
  "thin-vec",
 ]
 
@@ -857,6 +858,15 @@ name = "target-lexicon"
 version = "0.12.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1fc403891a21bcfb7c37834ba66a547a8f402146eba7265b5a6d88059c9ff2f"
+
+[[package]]
+name = "thin-string"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6cb610de3b9e546196f38346f862884965c0db8cc3448b51af7c4e335437481b"
+dependencies = [
+ "thin-vec",
+]
 
 [[package]]
 name = "thin-vec"

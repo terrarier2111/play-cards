@@ -1,5 +1,8 @@
 use std::{mem::transmute, num::NonZeroU64};
 
+use thin_string::ThinString;
+use thin_vec::ThinVec;
+
 use crate::nan_box::{NanBox64, TagBuilder};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -37,6 +40,10 @@ impl RtRef {
         Self(NanBox64::new_float(val))
     }
 
+    pub fn string(val: ThinString) -> Self {
+        Self(NanBox64::new_tag(TagBuilder::new_full_tag()))
+    }
+
     pub fn get_player(self) -> Option<Player> {
         match self.ty() {
             RtType::Player => Some(Player(self.dst() as usize as u64)),
@@ -58,9 +65,9 @@ impl RtRef {
         }
     }
 
-    pub fn get_cards(&self) -> Option<&Vec<CardVal>> {
+    pub fn get_cards(&self) -> Option<&ThinVec<CardVal>> {
         match self.ty() {
-            RtType::Cards => Some(unsafe { &*self.dst().cast::<Vec<CardVal>>() }),
+            RtType::Cards => Some(unsafe { &*self.dst().cast::<ThinVec<CardVal>>() }),
             _ => None,
         }
     }
@@ -99,11 +106,11 @@ impl RtRef {
         }
     }
 
-    pub(crate) unsafe fn get_string_directly(&self) -> &String {
-        unsafe { &*self.dst().cast::<String>() }
+    pub(crate) unsafe fn get_string_directly(&self) -> &ThinString {
+        unsafe { &*self.dst().cast::<ThinString>() }
     }
 
-    pub fn get_string(&self) -> Option<&String> {
+    pub fn get_string(&self) -> Option<&ThinString> {
         match self.ty() {
             RtType::String => Some(unsafe { self.get_string_directly() }),
             _ => None,

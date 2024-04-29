@@ -57,6 +57,10 @@ pub enum AstNode {
         name: String,
         params: Vec<AstNode>,
     },
+    UnaryOp {
+        val: Box<AstNode>,
+        op: UnaryOpKind,  
+    },
     BinOp {
         lhs: Box<AstNode>,
         rhs: Box<AstNode>,
@@ -83,4 +87,9 @@ pub enum BinOpKind {
     Lt, // LessThan
     Ge, // GreaterEqual
     Le, // LessEqual
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum UnaryOpKind {
+    Not,
 }
