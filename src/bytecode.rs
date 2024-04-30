@@ -120,8 +120,6 @@ impl<'a> Translator<'a> {
                         );
                     }
 
-                    println!("got args: {:?}", args);
-
                     let mut pops = 0;
                     let mut indices = thin_vec![];
                     for arg in args {
@@ -131,7 +129,6 @@ impl<'a> Translator<'a> {
                             &mut curr_scope.stack_size,
                         ) as UHalf);
                     }
-                    println!("indices: {:?}", indices);
                     self.code.push(ByteCode::Call {
                         fn_idx: fn_idx as u8,
                         push_val: false,

@@ -43,11 +43,9 @@ impl Vm {
                 } => {
                     let func = &mut self.funcs[*fn_idx as usize];
                     let args = {
-                        println!("stack: {:?}", self.stack);
                         let mut args = vec![];
                         // FIXME: perform type checking!
                         for (i, idx) in arg_indices.iter().enumerate() {
-                            println!("fetching {i}");
                             let val = self.stack.get(*idx as usize).unwrap();
                             args.push(*val);
                         }
