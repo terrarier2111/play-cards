@@ -200,6 +200,8 @@ impl<'a> Translator<'a> {
                         for _ in 0..pops {
                             self.code.push(ByteCode::Pop { offset: 1 });
                         }
+                        self.stack_idx -= pops;
+                        curr_scope.stack_size -= pops;
                         self.translate_internal(stmts);
                         let code_size = self.code.len() - prev_code_size;
                         self.code.insert(
