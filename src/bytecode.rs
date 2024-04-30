@@ -86,8 +86,6 @@ struct Scope {
     stack_size: usize,
 }
 
-const TRUE_IDX: usize = 0;
-
 struct Translator<'a> {
     code: Vec<ByteCode>,
     fns: &'a Vec<Function>,
@@ -145,47 +143,40 @@ impl<'a> Translator<'a> {
                     // and only ever jump up if the statement is true
                     let loop_start_len = self.code.len();
                     let mut pops = 0;
+                    self.translate_internal(stmts);
+                    let body_size = self.code.len() - loop_start_len;
+                    println!("body size: {}", body_size);
+
                     // this is the argument for the condition which decides whether to continue with the loop
                     let arg_idx =
                         self.translate_node(&condition, &mut pops, &mut curr_scope.stack_size);
+                        
+                    // cleanup for when we are in the loop
+                    for _ in 0..pops {
+                        self.code
+                            .insert(loop_start_len, ByteCode::Pop { offset: 0 });
+                    }
 
-                    let prev_len = self.code.len();
-                    self.translate_internal(stmts);
-                    let body_size = self.code.len() - prev_len;
+                    // jump to the condition right at the start
+                    self.code.insert(loop_start_len, ByteCode::Jump { relative_off: (body_size + pops) as isize + 1 });
 
                     // this includes the normal body size and all the additional code we generated for loop maintenance
                     // the + 1 if from the unconditional Jump we use to go back to the condition at the end of the loop
-                    let full_body_size = body_size + pops + 1;
+                    let full_body_size = self.code.len() - loop_start_len;
 
-                    // take the inverse of the condition
-                    self.code.insert(
-                        prev_len,
-                        ByteCode::Sub {
-                            arg1_idx: TRUE_IDX as UHalf,
-                            arg2_idx: arg_idx as UHalf,
-                        },
-                    );
                     // skip the body if the inverse condition turns out to be true
-                    self.code.insert(
-                        prev_len + 1,
+                    self.code.push(
                         ByteCode::JumpCond {
-                            relative_off: full_body_size as isize,
+                            relative_off: -(full_body_size as isize - 1),
                             arg_idx: arg_idx as UHalf,
                         },
                     );
-                    // cleanup for when we enter the loop
-                    for i in 0..pops {
-                        self.code
-                            .insert(prev_len + 2 + i, ByteCode::Pop { offset: 0 });
-                    }
-                    // go back to the beginning of the loop and retest its condition
-                    self.code.push(ByteCode::Jump {
-                        relative_off: -((self.code.len() - loop_start_len) as isize),
-                    });
                     // cleanup for when we exit the loop
                     for _ in 0..pops {
                         self.code.push(ByteCode::Pop { offset: 0 });
                     }
+                    self.stack_idx -= 1;
+                    curr_scope.stack_size -= 1;
                 }
                 Stmt::Conditional { seq, fallback } => {
                     let mut jump_indices = vec![];
@@ -239,6 +230,7 @@ impl<'a> Translator<'a> {
         for _ in 0..curr_scope.stack_size {
             self.code.push(ByteCode::Pop { offset: 0 });
         }
+        self.stack_idx -= curr_scope.stack_size;
     }
 
     /// returns the corresponding stack index
@@ -455,15 +447,10 @@ pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
     let mut translator = Translator {
         code: vec![],
         fns,
-        stack_idx: 1,
+        stack_idx: 0,
         vars: HashMap::new(),
     };
-    // used in jump conditional code to reverse the condition (this is pretty hacky but works and is fast)
-    translator.code.push(ByteCode::Push {
-        val: RtRef::bool(true),
-    });
     translator.translate_internal(stmts);
-    translator.code.push(ByteCode::Pop { offset: 0 });
-    translator.optimize();
+    // translator.optimize();
     translator.code
 }
