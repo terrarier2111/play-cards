@@ -139,7 +139,7 @@ impl<'a> Translator<'a> {
                     self.stack_idx -= pops;
                 }
                 Stmt::Loop { stmts, condition } => {
-                    // FIXME: rework this loop logic to jump (at the beginning of the loop) to the condition which we shall put at the end of the loop
+                    // this loop logic works by jumping (at the beginning of the loop) to the condition which we shall put at the end of the loop
                     // and only ever jump up if the statement is true
                     let loop_start_len = self.code.len();
                     let mut pops = 0;
@@ -451,6 +451,6 @@ pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
         vars: HashMap::new(),
     };
     translator.translate_internal(stmts);
-    // translator.optimize();
+    translator.optimize();
     translator.code
 }

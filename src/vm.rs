@@ -30,10 +30,13 @@ impl Vm {
                 ByteCode::Pop { offset } => {
                     // FIXME: cleanup backing storage if necessary or reduce reference counter
                     let val = self.stack.remove(self.stack.len() - 1 - *offset as usize);
-                    if let Some(val) = val.get_decimal() {
-                        println!("popped val {:?}", val);
-                    } else {
-                        println!("popped other {:?}", val.ty());
+                    // free up unused memory
+                    match val.ty() {
+                        RtType::String => {
+                            let _ = unsafe { Box::from_raw(val.dst()) };
+                        },
+                        RtType::Cards => todo!(),
+                        _ => {},
                     }
                 }
                 ByteCode::Call {
@@ -51,10 +54,8 @@ impl Vm {
                         }
                         args
                     };
-                    println!("calling fn!");
                     let fun = func.call;
                     let val = fun(args);
-                    println!("called fn!");
                     if *push_val {
                         // FIXME: should we even push if the value is None?
                         self.stack.push(val.unwrap_or(RtRef::NULL));
