@@ -135,7 +135,7 @@ impl Vm {
                     let left = *self.stack.get(*arg1_idx as usize).unwrap();
                     let right = *self.stack.get(*arg2_idx as usize).unwrap();
                     // FIXME: add implicit conversion
-                    assert!(left.ty() == right.ty());
+                    assert!(left.ty() == right.ty(), "got {:?} and {:?}", left.ty(), right.ty());
                     let cmp = match left.ty() {
                         RtType::Decimal => Ordering::from_std(unsafe {
                             left.get_decimal_directly()

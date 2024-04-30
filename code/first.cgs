@@ -4,7 +4,7 @@
 res = 3
 if res == 6 {
     test = 7
-    loop {
+    while 1 == 1 {
         print("testing {}", test)
     }
 } else {

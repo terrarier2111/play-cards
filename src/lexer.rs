@@ -48,6 +48,8 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
             );
             let lit = core::mem::take(&mut buffer);
             let token = match lit.as_str() {
+                "true" => Token::Bool(true),
+                "false" => Token::Bool(false),
                 "while" => Token::While,
                 "if" => Token::If,
                 "else" => Token::Else,

@@ -407,6 +407,48 @@ impl<'a> Translator<'a> {
             .0;
         fn_idx
     }
+
+    fn optimize(&mut self) {
+        let mut optimized = false;
+        while !optimized {
+            optimized = true;
+            // try eliminating push/pop(0) sequences
+            for i in 1..self.code.len() {
+                if let ByteCode::Push { .. } = self.code[i - 1] {
+                    if let ByteCode::Pop { offset: 0 } = self.code[i] {
+                        // fixup jumps
+                        for j in 0..self.code.len() {
+                            if let ByteCode::Jump { relative_off } | ByteCode::JumpCond { relative_off, .. } = &mut self.code[j] {
+                                let other = ((j as isize) + *relative_off) as usize;
+                                let range = j.min(other)..(j.max(other));
+                                let mut containing = 0;
+                                if range.contains(&i) {
+                                    containing += 1;
+                                }
+                                if range.contains(&(i - 1)) {
+                                    containing += 1;
+                                }
+                                if containing != 0 {
+                                    if relative_off.is_negative() {
+                                        *relative_off += containing;
+                                    } else {
+                                        *relative_off -= containing;
+                                    }
+                                }
+                            }
+                        }
+                        self.code.remove(i);
+                        self.code.remove(i - 1);
+                        optimized = false;
+                        // FIXME: deallocate if necessary
+
+                        // continue optimization cycle
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
@@ -422,5 +464,6 @@ pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
     });
     translator.translate_internal(stmts);
     translator.code.push(ByteCode::Pop { offset: 0 });
+    translator.optimize();
     translator.code
 }
