@@ -13,5 +13,6 @@
 
 while true {
     test = 7
-    print("testing {}", test)
+    test2 = test + 5 * 3
+    print("testing {} | {}", test2, test)
 }

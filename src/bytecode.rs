@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem, ptr};
+use std::collections::HashMap;
 
 use thin_vec::{thin_vec, ThinVec};
 
@@ -83,7 +83,6 @@ pub struct Function {
 
 struct Scope {
     vars: Vec<String>,
-    stack_size: usize,
 }
 
 struct Translator<'a> {
@@ -97,13 +96,13 @@ impl<'a> Translator<'a> {
     fn translate_internal(&mut self, stmts: &Vec<Stmt>) {
         let mut curr_scope = Scope {
             vars: vec![],
-            stack_size: 0,
         };
+        let initial_stack_idx = self.stack_idx;
         for stmt in stmts {
             match stmt {
                 Stmt::DefineVar { name, val } => {
                     let mut _pops = 0;
-                    let var_idx = self.translate_node(val, &mut _pops, &mut curr_scope.stack_size);
+                    let var_idx = self.translate_node(val, &mut _pops);
                     curr_scope.vars.push(name.clone());
                     self.vars.insert(name.clone(), var_idx);
                 }
@@ -124,7 +123,6 @@ impl<'a> Translator<'a> {
                         indices.push(self.translate_node(
                             &arg,
                             &mut pops,
-                            &mut curr_scope.stack_size,
                         ) as UHalf);
                     }
                     self.code.push(ByteCode::Call {
@@ -135,7 +133,6 @@ impl<'a> Translator<'a> {
                     for _ in 0..pops {
                         self.code.push(ByteCode::Pop { offset: 0 });
                     }
-                    curr_scope.stack_size -= pops;
                     self.stack_idx -= pops;
                 }
                 Stmt::Loop { stmts, condition } => {
@@ -149,7 +146,7 @@ impl<'a> Translator<'a> {
 
                     // this is the argument for the condition which decides whether to continue with the loop
                     let arg_idx =
-                        self.translate_node(&condition, &mut pops, &mut curr_scope.stack_size);
+                        self.translate_node(&condition, &mut pops);
                         
                     // cleanup for when we are in the loop
                     for _ in 0..pops {
@@ -176,14 +173,13 @@ impl<'a> Translator<'a> {
                         self.code.push(ByteCode::Pop { offset: 0 });
                     }
                     self.stack_idx -= 1;
-                    curr_scope.stack_size -= 1;
                 }
                 Stmt::Conditional { seq, fallback } => {
                     let mut jump_indices = vec![];
                     for (cond, stmts) in seq.iter() {
                         let mut pops = 0;
                         let cond_val_idx =
-                            self.translate_node(&cond, &mut pops, &mut curr_scope.stack_size);
+                            self.translate_node(&cond, &mut pops);
                         let cond_idx = self.code.len();
 
                         let prev_code_size = self.code.len();
@@ -192,7 +188,6 @@ impl<'a> Translator<'a> {
                             self.code.push(ByteCode::Pop { offset: 1 });
                         }
                         self.stack_idx -= pops;
-                        curr_scope.stack_size -= pops;
                         self.translate_internal(stmts);
                         let code_size = self.code.len() - prev_code_size;
                         self.code.insert(
@@ -227,10 +222,11 @@ impl<'a> Translator<'a> {
             // FIXME: this is buggy as if there are multiple variables with the same name, it will come to collisions (if they are in different scopes)
             self.vars.remove(&var);
         }
-        for _ in 0..curr_scope.stack_size {
+        let stack_delta = self.stack_idx - initial_stack_idx;
+        for _ in 0..stack_delta {
             self.code.push(ByteCode::Pop { offset: 0 });
         }
-        self.stack_idx -= curr_scope.stack_size;
+        self.stack_idx = initial_stack_idx;
     }
 
     /// returns the corresponding stack index
@@ -238,7 +234,6 @@ impl<'a> Translator<'a> {
         &mut self,
         node: &AstNode,
         pops: &mut usize,
-        curr_stack_frame_size: &mut usize,
     ) -> usize {
         match node {
             AstNode::CallFunc { name, params } => {
@@ -248,7 +243,7 @@ impl<'a> Translator<'a> {
                 let mut indices = thin_vec![];
                 for param in params {
                     indices.push(
-                        self.translate_node(param, &mut call_pops, curr_stack_frame_size) as UHalf,
+                        self.translate_node(param, &mut call_pops) as UHalf,
                     );
                 }
 
@@ -264,17 +259,15 @@ impl<'a> Translator<'a> {
 
                 *pops += 1;
                 self.stack_idx += 1;
-                *curr_stack_frame_size += 1;
 
                 self.stack_idx -= call_pops;
-                *curr_stack_frame_size -= call_pops;
 
                 self.stack_idx - 1
             }
             AstNode::BinOp { lhs, rhs, op } => {
                 let mut local_pops = 0;
-                let idx1 = self.translate_node(lhs, &mut local_pops, curr_stack_frame_size);
-                let idx2 = self.translate_node(rhs, &mut local_pops, curr_stack_frame_size);
+                let idx1 = self.translate_node(lhs, &mut local_pops);
+                let idx2 = self.translate_node(rhs, &mut local_pops);
                 match op {
                     crate::ast::BinOpKind::Add => {
                         self.code.push(ByteCode::Add {
@@ -364,19 +357,16 @@ impl<'a> Translator<'a> {
                 for _ in 0..local_pops {
                     self.code.push(ByteCode::Pop { offset: 1 });
                 }
-                *curr_stack_frame_size -= local_pops;
                 self.stack_idx -= local_pops;
 
                 *pops += 1;
                 self.stack_idx += 1;
-                *curr_stack_frame_size += 1;
                 self.stack_idx - 1
             }
             AstNode::Val(val) => {
                 self.code.push(ByteCode::Push { val: *val });
                 *pops += 1;
                 self.stack_idx += 1;
-                *curr_stack_frame_size += 1;
                 self.stack_idx - 1
             }
             AstNode::Var { name } => *self.vars.get(name).unwrap(),
