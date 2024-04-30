@@ -124,6 +124,18 @@ impl RtRef {
             _ => None,
         }
     }
+
+    pub fn to_string(self) -> String {
+        match self.ty {
+            RtType::Decimal => unsafe { transmute::<_, f64>(self.val) }.to_string(),
+            RtType::None => "Null".to_string(),
+            RtType::Bool => unsafe { transmute::<_, bool>(self.val as u8) }.to_string(),
+            RtType::String => unsafe { (self.val as *const String).as_ref().unwrap() }.clone(),
+            RtType::Player => todo!(),
+            RtType::Inventory => todo!(),
+            RtType::Cards => todo!(),
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]

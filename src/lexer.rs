@@ -41,12 +41,11 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
         }
         if chr.is_alphabetic() {
             buffer.push(chr);
-            collect_string_until(
+            next_chr = collect_string_until(
                 &mut iter,
                 |chr| !(chr.is_alphanumeric() || chr == '_'),
                 &mut buffer,
             );
-            next_chr = iter.next();
             let lit = core::mem::take(&mut buffer);
             let token = match lit.as_str() {
                 "while" => Token::While,
@@ -156,13 +155,14 @@ fn collect_string_until<F: FnMut(char) -> bool>(
     src: &mut Chars<'_>,
     mut until: F,
     buffer: &mut String,
-) {
+) -> Option<char> {
     while let Some(chr) = src.next() {
         if until(chr) {
-            break;
+            return Some(chr);
         }
         buffer.push(chr);
     }
+    None
 }
 
 #[derive(Clone, PartialEq, Debug)]

@@ -87,8 +87,10 @@ impl Parser {
             Token::While => self.parse_loop(),
             Token::If => self.parse_if(),
             Token::Lit(var) => {
+                println!("got var {}", var);
                 match self.next() {
                     Some(Token::OpenBrace) => {
+                        println!("open brace!");
                         // parse function call
                         let mut params = vec![];
                         loop {
@@ -115,7 +117,7 @@ impl Parser {
                             val: self.try_parse_bin_op()?,
                         })
                     }
-                    _ => panic!("Can't parse var or func"),
+                    token => panic!("Can't parse var or func {:?}", token),
                 }
             }
             token => panic!("didn't expect token {:?}", token),

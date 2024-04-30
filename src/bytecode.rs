@@ -76,8 +76,9 @@ pub type UHalf = u8;
 
 pub struct Function {
     pub params: &'static [RtType],
+    pub var_len: bool,
     pub name: String,
-    pub call: Box<dyn FnMut(Vec<RtRef>) -> Option<RtRef>>,
+    pub call: fn(Vec<RtRef>) -> Option<RtRef>,
 }
 
 struct Scope {
@@ -131,7 +132,7 @@ fn translate_internal(
                 let fn_idx = resolve_fn_idx(fns, name);
 
                 // FIXME: check arg types
-                if fns[fn_idx].params.len() != args.len() {
+                if !fns[fn_idx].var_len && fns[fn_idx].params.len() != args.len() {
                     panic!("Function arg count mismatch (\"{}\")", fns[fn_idx].name);
                 }
 

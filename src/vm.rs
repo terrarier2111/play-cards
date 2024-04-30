@@ -21,6 +21,7 @@ impl Vm {
     }
 
     pub fn run(&mut self) {
+        // FIXME: run an optimizer on the bytecode beforehand, eliminating push/pop sequences
         while let Some(curr) = self.code.get(self.ip) {
             match curr {
                 ByteCode::Push { val } => {
@@ -45,15 +46,17 @@ impl Vm {
                 } => {
                     let func = &mut self.funcs[*fn_idx as usize];
                     let args = {
+                        println!("stack: {:?}", self.stack);
                         let mut args = vec![];
                         // FIXME: perform type checking!
                         for (i, _ty) in func.params.iter().enumerate() {
-                            let val = self.stack.get(arg_indices[i] as usize).unwrap();
+                            println!("fetching {i}");
+                            let val = self.stack.get(arg_indices[i] as usize).unwrap(); // FIXME: both arg indices are 1 too large
                             args.push(*val);
                         }
                         args
                     };
-                    let fun = func.call.as_mut();
+                    let fun = func.call;
                     let val = fun(args);
                     if *push_val {
                         // FIXME: should we even push if the value is None?

@@ -6,3 +6,4 @@ mod nan_box;
 mod parser;
 mod rt;
 mod vm;
+mod funcs;
