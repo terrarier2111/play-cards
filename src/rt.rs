@@ -96,7 +96,7 @@ impl RtRef {
                 let val = unsafe { self.get_string_directly() };
                 match val.parse::<f64>() {
                     Ok(val) => Some(val),
-                    Err(_) => todo!(),
+                    Err(_) => None,
                 }
             }
             _ => None,

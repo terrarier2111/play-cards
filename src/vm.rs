@@ -28,9 +28,6 @@ impl Vm {
                     self.stack.push(*val); // FIXME: if this val has a backing allocation, clone it or use reference counters.
                 }
                 ByteCode::Pop { offset } => {
-                    for (idx, val) in self.stack.iter().enumerate() {
-                        println!("idx {} | {:?}: {:?}", idx, val.ty(), val.get_decimal());
-                    }
                     // FIXME: cleanup backing storage if necessary or reduce reference counter
                     let val = self.stack.remove(self.stack.len() - 1 - *offset as usize);
                     if let Some(val) = val.get_decimal() {
@@ -49,15 +46,17 @@ impl Vm {
                         println!("stack: {:?}", self.stack);
                         let mut args = vec![];
                         // FIXME: perform type checking!
-                        for (i, _ty) in func.params.iter().enumerate() {
+                        for (i, idx) in arg_indices.iter().enumerate() {
                             println!("fetching {i}");
-                            let val = self.stack.get(arg_indices[i] as usize).unwrap(); // FIXME: both arg indices are 1 too large
+                            let val = self.stack.get(*idx as usize).unwrap();
                             args.push(*val);
                         }
                         args
                     };
+                    println!("calling fn!");
                     let fun = func.call;
                     let val = fun(args);
+                    println!("called fn!");
                     if *push_val {
                         // FIXME: should we even push if the value is None?
                         self.stack.push(val.unwrap_or(RtRef::NULL));
