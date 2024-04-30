@@ -122,7 +122,8 @@ impl Vm {
                 } => {
                     let val = *self.stack.get(*arg_idx as usize).unwrap(); // FIXME: guard against inval param
                     if val.ty() != RtType::Bool {
-                        panic!("invalid type {:?} {:?}", val.ty(), val.get_decimal()); // FIXME: auto convert to bool if possible
+                        panic!("invalid type {:?} {:?}", val.ty(), val.get_decimal());
+                        // FIXME: auto convert to bool if possible
                     }
                     if val == RtRef::bool(true) {
                         self.ip = ((self.ip as isize) + *relative_off) as usize; // FIXME: guard against overflow!
