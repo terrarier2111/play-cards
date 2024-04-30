@@ -94,9 +94,7 @@ struct Translator<'a> {
 
 impl<'a> Translator<'a> {
     fn translate_internal(&mut self, stmts: &Vec<Stmt>) {
-        let mut curr_scope = Scope {
-            vars: vec![],
-        };
+        let mut curr_scope = Scope { vars: vec![] };
         let initial_stack_idx = self.stack_idx;
         for stmt in stmts {
             match stmt {
@@ -120,10 +118,7 @@ impl<'a> Translator<'a> {
                     let mut pops = 0;
                     let mut indices = thin_vec![];
                     for arg in args {
-                        indices.push(self.translate_node(
-                            &arg,
-                            &mut pops,
-                        ) as UHalf);
+                        indices.push(self.translate_node(&arg, &mut pops) as UHalf);
                     }
                     self.code.push(ByteCode::Call {
                         fn_idx: fn_idx as u8,
@@ -145,9 +140,8 @@ impl<'a> Translator<'a> {
                     println!("body size: {}", body_size);
 
                     // this is the argument for the condition which decides whether to continue with the loop
-                    let arg_idx =
-                        self.translate_node(&condition, &mut pops);
-                        
+                    let arg_idx = self.translate_node(&condition, &mut pops);
+
                     // cleanup for when we are in the loop
                     for _ in 0..pops {
                         self.code
@@ -155,19 +149,22 @@ impl<'a> Translator<'a> {
                     }
 
                     // jump to the condition right at the start
-                    self.code.insert(loop_start_len, ByteCode::Jump { relative_off: (body_size + pops) as isize + 1 });
+                    self.code.insert(
+                        loop_start_len,
+                        ByteCode::Jump {
+                            relative_off: (body_size + pops) as isize + 1,
+                        },
+                    );
 
                     // this includes the normal body size and all the additional code we generated for loop maintenance
                     // the + 1 if from the unconditional Jump we use to go back to the condition at the end of the loop
                     let full_body_size = self.code.len() - loop_start_len;
 
                     // skip the body if the inverse condition turns out to be true
-                    self.code.push(
-                        ByteCode::JumpCond {
-                            relative_off: -(full_body_size as isize - 1),
-                            arg_idx: arg_idx as UHalf,
-                        },
-                    );
+                    self.code.push(ByteCode::JumpCond {
+                        relative_off: -(full_body_size as isize - 1),
+                        arg_idx: arg_idx as UHalf,
+                    });
                     // cleanup for when we exit the loop
                     for _ in 0..pops {
                         self.code.push(ByteCode::Pop { offset: 0 });
@@ -178,8 +175,7 @@ impl<'a> Translator<'a> {
                     let mut jump_indices = vec![];
                     for (cond, stmts) in seq.iter() {
                         let mut pops = 0;
-                        let cond_val_idx =
-                            self.translate_node(&cond, &mut pops);
+                        let cond_val_idx = self.translate_node(&cond, &mut pops);
                         let cond_idx = self.code.len();
 
                         let prev_code_size = self.code.len();
@@ -230,11 +226,7 @@ impl<'a> Translator<'a> {
     }
 
     /// returns the corresponding stack index
-    fn translate_node(
-        &mut self,
-        node: &AstNode,
-        pops: &mut usize,
-    ) -> usize {
+    fn translate_node(&mut self, node: &AstNode, pops: &mut usize) -> usize {
         match node {
             AstNode::CallFunc { name, params } => {
                 let func_idx = self.resolve_fn_idx(name);
@@ -242,9 +234,7 @@ impl<'a> Translator<'a> {
                 let mut call_pops = 0;
                 let mut indices = thin_vec![];
                 for param in params {
-                    indices.push(
-                        self.translate_node(param, &mut call_pops) as UHalf,
-                    );
+                    indices.push(self.translate_node(param, &mut call_pops) as UHalf);
                 }
 
                 self.code.push(ByteCode::Call {
@@ -400,7 +390,9 @@ impl<'a> Translator<'a> {
                     if let ByteCode::Pop { offset: 0 } = self.code[i] {
                         // fixup jumps
                         for j in 0..self.code.len() {
-                            if let ByteCode::Jump { relative_off } | ByteCode::JumpCond { relative_off, .. } = &mut self.code[j] {
+                            if let ByteCode::Jump { relative_off }
+                            | ByteCode::JumpCond { relative_off, .. } = &mut self.code[j]
+                            {
                                 let other = ((j as isize) + *relative_off) as usize;
                                 let range = j.min(other)..(j.max(other));
                                 let mut containing = 0;
