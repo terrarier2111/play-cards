@@ -20,6 +20,17 @@ impl Vm {
         }
     }
 
+    fn cleanup(val: RtRef) {
+        // free up unused memory
+        match val.ty() {
+            RtType::String => {
+                let _ = unsafe { Box::from_raw(val.dst()) };
+            }
+            RtType::Cards => todo!(),
+            _ => {}
+        }
+    }
+
     pub fn run(&mut self) {
         // FIXME: run an optimizer on the bytecode beforehand, eliminating push/pop sequences
         while let Some(curr) = self.code.get(self.ip) {
@@ -30,14 +41,14 @@ impl Vm {
                 ByteCode::Pop { offset } => {
                     // FIXME: cleanup backing storage if necessary or reduce reference counter
                     let val = self.stack.remove(self.stack.len() - 1 - *offset as usize);
-                    // free up unused memory
-                    match val.ty() {
-                        RtType::String => {
-                            let _ = unsafe { Box::from_raw(val.dst()) };
-                        }
-                        RtType::Cards => todo!(),
-                        _ => {}
-                    }
+                    Self::cleanup(val);
+                }
+                ByteCode::Mov { src_idx, dst_idx } => {
+                    let prev = self.stack[*dst_idx as usize];
+
+                    // FIXME: clone src (allocation) if necessary
+                    self.stack[*dst_idx as usize] = self.stack[*src_idx as usize];
+                    Self::cleanup(prev);
                 }
                 ByteCode::Call {
                     fn_idx,

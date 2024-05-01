@@ -31,6 +31,14 @@ impl Parser {
         ret
     }
 
+    fn parse_lit(&mut self) -> Option<String> {
+        if let Some(Token::Lit(lit)) = self.next() {
+            Some(lit)
+        } else {
+            None
+        }
+    }
+
     fn parse_loop(&mut self) -> anyhow::Result<Stmt> {
         let cond = self.try_parse_bin_op()?;
         if !self.try_eat(TokenKind::OpenCurly) {
@@ -81,11 +89,24 @@ impl Parser {
         })
     }
 
+    fn parse_let(&mut self) -> anyhow::Result<Stmt> {
+        let name = self.parse_lit().unwrap();
+        if !self.try_eat(TokenKind::Assign) {
+            panic!("Missing =");
+        }
+        Ok(Stmt::DefineVar {
+            name,
+            val: self.try_parse_bin_op()?,
+            reassign: false,
+        })
+    }
+
     fn parse_stmt(&mut self) -> anyhow::Result<Stmt> {
         match self.next().unwrap() {
             Token::OpenCurly => todo!(),
             Token::While => self.parse_loop(),
             Token::If => self.parse_if(),
+            Token::Let => self.parse_let(),
             Token::Lit(var) => {
                 match self.next() {
                     Some(Token::OpenBrace) => {
@@ -113,6 +134,7 @@ impl Parser {
                         Ok(Stmt::DefineVar {
                             name: var,
                             val: self.try_parse_bin_op()?,
+                            reassign: true,
                         })
                     }
                     token => panic!("Can't parse var or func {:?}", token),
@@ -208,6 +230,7 @@ pub enum Stmt {
     DefineVar {
         name: String,
         val: AstNode,
+        reassign: bool,
     },
     CallFunc {
         name: String,

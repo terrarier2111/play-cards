@@ -19,6 +19,10 @@ pub enum ByteCode {
         /// when looking for an element to pop from the stack
         offset: u8, // offsets other than 0 and 1 are unsupported
     },
+    Mov {
+        src_idx: UHalf,
+        dst_idx: UHalf,
+    },
     Call {
         fn_idx: u8,
         push_val: bool,
@@ -89,7 +93,7 @@ struct Translator<'a> {
     code: Vec<ByteCode>,
     fns: &'a Vec<Function>,
     stack_idx: usize,
-    vars: HashMap<String, usize>,
+    vars: HashMap<String, Vec<usize>>,
 }
 
 impl<'a> Translator<'a> {
@@ -98,11 +102,29 @@ impl<'a> Translator<'a> {
         let initial_stack_idx = self.stack_idx;
         for stmt in stmts {
             match stmt {
-                Stmt::DefineVar { name, val } => {
-                    let mut _pops = 0;
-                    let var_idx = self.translate_node(val, &mut _pops);
-                    curr_scope.vars.push(name.clone());
-                    self.vars.insert(name.clone(), var_idx);
+                Stmt::DefineVar {
+                    name,
+                    val,
+                    reassign,
+                } => {
+                    println!("define: {}", *reassign);
+                    let mut pops = 0;
+                    let var_idx = self.translate_node(val, &mut pops);
+                    if *reassign {
+                        let indices = self.vars.get(name).unwrap();
+                        let idx = indices.last().unwrap();
+                        self.code.push(ByteCode::Mov {
+                            dst_idx: *idx as UHalf,
+                            src_idx: var_idx as UHalf,
+                        });
+                        for _ in 0..pops {
+                            self.code.push(ByteCode::Pop { offset: 0 });
+                        }
+                        self.stack_idx -= pops;
+                    } else {
+                        curr_scope.vars.push(name.clone());
+                        self.vars.entry(name.clone()).or_default().push(var_idx);
+                    }
                 }
                 Stmt::CallFunc { name, args } => {
                     let fn_idx = self.resolve_fn_idx(name);
@@ -216,7 +238,7 @@ impl<'a> Translator<'a> {
         }
         for var in curr_scope.vars {
             // FIXME: this is buggy as if there are multiple variables with the same name, it will come to collisions (if they are in different scopes)
-            self.vars.remove(&var);
+            self.vars.get_mut(&var).unwrap().pop();
         }
         let stack_delta = self.stack_idx - initial_stack_idx;
         for _ in 0..stack_delta {
@@ -359,7 +381,7 @@ impl<'a> Translator<'a> {
                 self.stack_idx += 1;
                 self.stack_idx - 1
             }
-            AstNode::Var { name } => *self.vars.get(name).unwrap(),
+            AstNode::Var { name } => *self.vars.get(name).unwrap().last().unwrap(),
             AstNode::UnaryOp { val, op } => match *op {
                 crate::ast::UnaryOpKind::Not => {
                     todo!()

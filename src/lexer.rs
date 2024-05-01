@@ -49,6 +49,7 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
             let token = match lit.as_str() {
                 "true" => Token::Bool(true),
                 "false" => Token::Bool(false),
+                "let" => Token::Let,
                 "while" => Token::While,
                 "if" => Token::If,
                 "else" => Token::Else,
@@ -188,6 +189,7 @@ pub enum Token {
     CloseBrace,
     OpenCurly,
     CloseCurly,
+    Let,
     While,
     If,
     Else,
@@ -218,6 +220,7 @@ impl Token {
             Token::Exclam => TokenKind::Exclam,
             Token::And => TokenKind::And,
             Token::Or => TokenKind::Or,
+            Token::Let => TokenKind::Let,
             Token::While => TokenKind::While,
             Token::If => TokenKind::If,
             Token::Else => TokenKind::Else,
@@ -253,6 +256,7 @@ pub enum TokenKind {
     CloseBrace, // `)`
     OpenCurly,  // `{`
     CloseCurly, // `}`
+    Let,
     While,
     If,
     Else,
