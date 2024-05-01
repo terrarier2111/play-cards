@@ -31,23 +31,32 @@ impl Vm {
         }
     }
 
+    fn clone_ref(val: RtRef) -> RtRef {
+        match val.ty() {
+            RtType::String => {
+                let cloned = unsafe { val.get_string_directly() }.clone();
+                RtRef::string(Box::new(cloned))
+            }
+            RtType::Cards => todo!(),
+            _ => val,
+        }
+    }
+
     pub fn run(&mut self) {
         // FIXME: run an optimizer on the bytecode beforehand, eliminating push/pop sequences
         while let Some(curr) = self.code.get(self.ip) {
             match curr {
                 ByteCode::Push { val } => {
-                    self.stack.push(*val); // FIXME: if this val has a backing allocation, clone it or use reference counters.
+                    self.stack.push(Self::clone_ref(*val));
                 }
                 ByteCode::Pop { offset } => {
-                    // FIXME: cleanup backing storage if necessary or reduce reference counter
                     let val = self.stack.remove(self.stack.len() - 1 - *offset as usize);
                     Self::cleanup(val);
                 }
                 ByteCode::Mov { src_idx, dst_idx } => {
                     let prev = self.stack[*dst_idx as usize];
 
-                    // FIXME: clone src (allocation) if necessary
-                    self.stack[*dst_idx as usize] = self.stack[*src_idx as usize];
+                    self.stack[*dst_idx as usize] = Self::clone_ref(self.stack[*src_idx as usize]);
                     Self::cleanup(prev);
                 }
                 ByteCode::Call {
