@@ -107,7 +107,6 @@ impl<'a> Translator<'a> {
                     val,
                     reassign,
                 } => {
-                    println!("define: {}", *reassign);
                     let mut pops = 0;
                     let var_idx = self.translate_node(val, &mut pops);
                     if *reassign {
@@ -130,7 +129,13 @@ impl<'a> Translator<'a> {
                     let fn_idx = self.resolve_fn_idx(name);
 
                     // FIXME: check arg types
-                    if !self.fns[fn_idx].var_len && self.fns[fn_idx].params.len() != args.len() {
+
+                    // if the argument count doesn't match and if the function isn't of variable length
+                    // or if the required arguments of the variable length function aren't present,
+                    // fail calling and inform the user
+                    if (!self.fns[fn_idx].var_len || self.fns[fn_idx].params.len() > args.len())
+                        && self.fns[fn_idx].params.len() != args.len()
+                    {
                         panic!(
                             "Function arg count mismatch (\"{}\")",
                             self.fns[fn_idx].name
