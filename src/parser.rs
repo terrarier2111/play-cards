@@ -1,3 +1,5 @@
+use std::{error::Error, fmt::{Debug, Display}};
+
 use crate::{
     ast::{AstNode, BinOpKind, UnaryOpKind},
     lexer::{Token, TokenKind},
@@ -42,7 +44,7 @@ impl Parser {
     fn parse_loop(&mut self) -> anyhow::Result<Stmt> {
         let cond = self.try_parse_bin_op()?;
         if !self.try_eat(TokenKind::OpenCurly) {
-            panic!("Error parsing loop");
+            return Err(error("Missing `{` in loop".to_string()));
         }
         let mut stmts = vec![];
         while !self.try_eat(TokenKind::CloseCurly) {
@@ -60,7 +62,7 @@ impl Parser {
         loop {
             let cond = self.try_parse_bin_op()?;
             if !self.try_eat(TokenKind::OpenCurly) {
-                panic!("Error parsing if");
+                return Err(error("Missing `{` in if".to_string()));
             }
             let mut stmts = vec![];
             while !self.try_eat(TokenKind::CloseCurly) {
@@ -72,7 +74,7 @@ impl Parser {
                     continue;
                 }
                 if !self.try_eat(TokenKind::OpenCurly) {
-                    panic!("Error parsing else");
+                    return Err(error("Missing `{` in else".to_string()));
                 }
                 let mut stmts = vec![];
                 while !self.try_eat(TokenKind::CloseCurly) {
@@ -92,7 +94,7 @@ impl Parser {
     fn parse_let(&mut self) -> anyhow::Result<Stmt> {
         let name = self.parse_lit().unwrap();
         if !self.try_eat(TokenKind::Assign) {
-            panic!("Missing =");
+            return Err(error("Missing `=` in let".to_string()));
         }
         Ok(Stmt::DefineVar {
             name,
@@ -121,7 +123,7 @@ impl Parser {
                                 if self.try_eat(TokenKind::CloseBrace) {
                                     break;
                                 }
-                                panic!("Can't parse func");
+                                return Err(error("Missing `)` to match `(` for function calls".to_string()));
                             }
                         }
                         Ok(Stmt::CallFunc {
@@ -137,10 +139,10 @@ impl Parser {
                             reassign: true,
                         })
                     }
-                    token => panic!("Can't parse var or func {:?}", token),
+                    token => return Err(error(format!("Can't parse variable or function, expected `(` or `=`, but found `{:?}`", token))),
                 }
             }
-            token => panic!("didn't expect token {:?}", token),
+            token => return Err(error(format!("Didn't expect `{:?}` when parsing statement", token))),
         }
     }
 
@@ -156,7 +158,7 @@ impl Parser {
                 Token::OpenBrace => {
                     let op = self.try_parse_bin_op()?;
                     if !self.try_eat(TokenKind::CloseBrace) {
-                        panic!("Can't find closing brace");
+                        return Err(error("Missing `)` to match `(`".to_string()));
                     }
                     op
                 }
@@ -165,7 +167,7 @@ impl Parser {
                 Token::CharSeq(val) => AstNode::Val(RtRef::string(Box::new(val))),
                 Token::Number(val) => AstNode::Val(RtRef::decimal(val)),
                 Token::Bool(val) => AstNode::Val(RtRef::bool(val)),
-                token => unreachable!("found unexpected token {:?}", token),
+                token => return Err(error(format!("found unexpected token {:?} when parsing binop", token))),
             },
             None => unreachable!(),
         };
@@ -216,6 +218,10 @@ impl Parser {
     }
 }
 
+fn error(val: String) -> anyhow::Error {
+    anyhow::Error::new(ParseError(val))
+}
+
 pub fn parse(tokens: Vec<Token>) -> anyhow::Result<Vec<Stmt>> {
     let mut parser = Parser { idx: 0, tokens };
     let mut stmts = vec![];
@@ -244,4 +250,20 @@ pub enum Stmt {
         seq: Vec<(AstNode, Vec<Stmt>)>,
         fallback: Vec<Stmt>,
     },
+}
+
+pub struct ParseError(String);
+
+impl Error for ParseError {}
+
+impl Debug for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self, f)
+    }
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.as_str())
+    }
 }

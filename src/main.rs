@@ -11,6 +11,7 @@ mod nan_box;
 mod parser;
 mod rt;
 mod vm;
+mod span;
 
 fn main() {
     let tokens = lexer::lex(&fs::read_to_string("./code/first.cgs").unwrap()).unwrap();

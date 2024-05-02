@@ -14,7 +14,6 @@
 let i = 0
 while i < 8 {
     i = i + 1
-    let test = 7
-    let test2 = test + 5 * 3
-    print("testing {} | {}", test2, test)
+    let test = i + 5 * 3
+    print("testing {} | {}", i, test)
 }
