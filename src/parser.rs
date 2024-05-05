@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::{Debug, Display}};
+use std::{error::Error, fmt::{Debug, Display}, mem};
 
 use crate::{
     ast::{AstNode, BinOpKind, UnaryOpKind},
@@ -147,7 +147,7 @@ impl Parser {
     }
 
     fn try_parse_bin_op(&mut self) -> anyhow::Result<AstNode> {
-        let lhs = match self.next() {
+        let mut lhs = match self.next() {
             Some(token) => match token {
                 Token::Exclam => {
                     return Ok(AstNode::UnaryOp {
@@ -210,11 +210,42 @@ impl Parser {
         // eat bin_op token
         self.next();
         let rhs = self.try_parse_bin_op()?;
-        Ok(AstNode::BinOp {
-            lhs: Box::new(lhs),
-            rhs: Box::new(rhs),
-            op: bin_op,
-        })
+        let mut nodes = vec![];
+        let mut ops = vec![];
+        if let AstNode::BinOp { lhs, rhs, op } = lhs {
+            nodes.push(lhs);
+            nodes.push(rhs);
+            ops.push(op);
+        } else {
+            nodes.push(Box::new(lhs));
+        }
+        ops.push(bin_op);
+        if let AstNode::BinOp { lhs, rhs, op } = rhs {
+            nodes.push(lhs);
+            nodes.push(rhs);
+            ops.push(op);
+        } else {
+            nodes.push(Box::new(rhs));
+        }
+
+        let mut finished_nodes = vec![];
+        while !ops.is_empty() {
+            let mut highest_idx = 0;
+            let mut highest_prio = 0;
+            for op in ops.iter().enumerate() {
+                if op.1.priority() > highest_prio {
+                    highest_prio = op.1.priority();
+                    highest_idx = op.0;
+                }
+            }
+            let lhs = if !nodes.is_empty() { nodes.remove(highest_idx) } else { finished_nodes.remove(0) };
+            let rhs = if !nodes.is_empty() { nodes.remove(highest_idx) } else { finished_nodes.remove(0) };
+            let op = ops.remove(highest_idx);
+            finished_nodes.push(Box::new(AstNode::BinOp { lhs: lhs, rhs: rhs, op }));
+        }
+
+
+        Ok(*finished_nodes.pop().unwrap())
     }
 }
 

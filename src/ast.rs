@@ -78,7 +78,7 @@ pub enum BinOpKind {
     Sub,
     Mul,
     Div,
-    Mod, // modulo
+    Mod, // Modulo
     And,
     Or,
     Eq, // Equal
@@ -87,6 +87,28 @@ pub enum BinOpKind {
     Lt, // LessThan
     Ge, // GreaterEqual
     Le, // LessEqual
+}
+
+impl BinOpKind {
+
+    pub fn priority(&self) -> usize {
+        match self {
+            BinOpKind::Add => 1,
+            BinOpKind::Sub => 1,
+            BinOpKind::Mul => 2,
+            BinOpKind::Div => 2,
+            BinOpKind::Mod => 2,
+            BinOpKind::And => 0,
+            BinOpKind::Or => 0,
+            BinOpKind::Eq => 0,
+            BinOpKind::Ne => 0,
+            BinOpKind::Gt => 0,
+            BinOpKind::Lt => 0,
+            BinOpKind::Ge => 0,
+            BinOpKind::Le => 0,
+        }
+    }
+
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
