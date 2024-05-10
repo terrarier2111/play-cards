@@ -4,8 +4,6 @@ use std::{
     str::Chars,
 };
 
-use log::error;
-
 pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
     let mut tokens = vec![];
     let mut buffer = String::new();
@@ -18,21 +16,20 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
         }
         if chr.is_numeric() {
             buffer.push(chr);
-            let mut dot = false;
+            let mut dots = 0;
             next_chr = collect_string_until(
                 &mut iter,
                 |chr| {
                     if chr == '.' {
-                        if dot {
-                            error!("Found more than 1 dot while parsing number");
-                            panic!();
-                        }
-                        dot = true;
+                        dots += 1;
                     }
                     !chr.is_numeric()
                 },
                 &mut buffer,
             );
+            if dots > 1 {
+                return Err(anyhow::Error::new(TooManyDots));
+            }
             tokens.push(Token::Number(
                 core::mem::take(&mut buffer).parse::<f64>().unwrap(),
             ));
@@ -281,5 +278,21 @@ impl Debug for UnknownToken {
         f.write_str("found unknown character ")?;
         f.write_char(self.0)?;
         f.write_str(" while lexing program")
+    }
+}
+
+pub struct TooManyDots;
+
+impl Error for TooManyDots {}
+
+impl Display for TooManyDots {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Found more than 1 dot while parsing number")
+    }
+}
+
+impl Debug for TooManyDots {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self, f)
     }
 }

@@ -11,3 +11,7 @@ image = "0.25"
 log = "0.4"
 thin-vec = "0.2"
 # thin-string = "0.2"
+
+engine = { version = "0.1", path = "./engine" }
+clitty = { git = "https://github.com/terrarier2111/CLItty" }
+swap_it = { git = "https://github.com/terrarier2111/SwapEbr" }

@@ -52,6 +52,13 @@ impl RtRef {
         }
     }
 
+    pub fn player(val: Player) -> Self {
+        Self {
+            ty: RtType::Player,
+            val: val.0 as usize,
+        }
+    }
+
     pub fn get_player(self) -> Option<Player> {
         match self.ty() {
             RtType::Player => Some(Player(self.dst() as usize as u64)),
@@ -177,6 +184,18 @@ pub struct CardVal(u64);
 #[derive(Clone, Copy, PartialEq)]
 #[repr(transparent)]
 pub struct Player(u64);
+
+impl Player {
+
+    pub fn new(idx: u64) -> Self {
+        Self(idx)
+    }
+
+    pub fn idx(self) -> u64 {
+        self.0
+    }
+
+}
 
 pub enum Visibility {
     None,
