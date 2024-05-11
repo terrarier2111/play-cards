@@ -1,14 +1,18 @@
 use std::{
     collections::HashMap,
     fs,
-    num::NonZeroUsize,
+    num::{NonZero, NonZeroUsize},
     sync::{atomic::AtomicUsize, Arc},
 };
 
 use clitty::{
-    core::{CLICore, CommandBuilder, CommandImpl, CommandParam, UsageBuilder},
+    core::{
+        CLICore, CmdParamNumConstraints, CmdParamStrConstraints, CommandBuilder, CommandImpl,
+        CommandParam, CommandParamTy, UsageBuilder,
+    },
     ui::{CLIBuilder, CmdLineInterface, PrintFallback},
 };
+use conc_once_cell::ConcurrentOnceCell;
 use game_ctx::{CardTemplate, GameCtx, GameTemplate, PlayerDef};
 use swap_it::{SwapArcOption, SwapGuard};
 
@@ -18,9 +22,12 @@ mod game_ctx;
 mod sized_box;
 
 static CTX: SwapArcOption<GameCtx> = SwapArcOption::new_empty();
+static CLI: ConcurrentOnceCell<CmdLineInterface<()>> = ConcurrentOnceCell::new();
 
 fn main() {
     const PATH: &str = "./code/first.cgs";
+
+    fs::create_dir_all(GAMES_DIR).unwrap();
 
     // FIXME: add UI
     let window = CLIBuilder::new()
@@ -36,7 +43,7 @@ fn main() {
                     .required(CommandParam {
                         name: "players",
                         ty: clitty::core::CommandParamTy::Unbound {
-                            minimum: NonZeroUsize::new(2).unwrap(),
+                            minimum: NonZeroUsize::new(1).unwrap(),
                             param: Box::new(clitty::core::CommandParamTy::String(
                                 clitty::core::CmdParamStrConstraints::None,
                             )),
@@ -44,13 +51,44 @@ fn main() {
                     }),
             ),
         )
+        .command(
+            CommandBuilder::new("create", CmdCreate).params(
+                UsageBuilder::new()
+                    .required(CommandParam {
+                        name: "name",
+                        ty: CommandParamTy::String(CmdParamStrConstraints::None),
+                    })
+                    .required(CommandParam {
+                        name: "code path",
+                        ty: CommandParamTy::String(CmdParamStrConstraints::None),
+                    })
+                    .required(CommandParam {
+                        name: "min players",
+                        ty: CommandParamTy::UInt(CmdParamNumConstraints::None),
+                    })
+                    .required(CommandParam {
+                        name: "max players",
+                        ty: CommandParamTy::UInt(CmdParamNumConstraints::None),
+                    })
+                    .required(CommandParam {
+                        name: "card paths",
+                        ty: CommandParamTy::Unbound {
+                            minimum: NonZero::new(1).unwrap(),
+                            param: Box::new(CommandParamTy::String(CmdParamStrConstraints::None)),
+                        },
+                    }),
+            ),
+        )
+        .command(CommandBuilder::new("games", CmdGames))
         .fallback(Box::new(PrintFallback::new(
             "This command is not known".to_string(),
         )))
         .prompt("Enter a command: ".to_string())
         .build();
-    let cli = CmdLineInterface::new(window);
-    cli.await_input(&()).unwrap();
+    CLI.get_or_init(|| CmdLineInterface::new(window));
+    loop {
+        CLI.get().unwrap().await_input(&()).unwrap();
+    }
 }
 
 pub fn get_ctx<'a>() -> SwapGuard<Arc<GameCtx>, GameCtx> {
@@ -72,6 +110,7 @@ impl CommandImpl for CmdPlay {
             .collect::<Vec<_>>();
         game.cards = cards;
         let code_path = game.code_path.clone();
+        // FIXME: enforce player limits
         let game = GameCtx {
             game,
             players: input
@@ -92,6 +131,60 @@ impl CommandImpl for CmdPlay {
         CTX.store(Arc::new(game));
         // start game
         engine::run(&code_path, vec![])?;
+        Ok(())
+    }
+}
+
+const GAMES_DIR: &str = "./play_cards/games/";
+
+struct CmdCreate;
+
+impl CommandImpl for CmdCreate {
+    type CTX = ();
+
+    fn execute(&self, _ctx: &Self::CTX, input: &[&str]) -> anyhow::Result<()> {
+        let game_name = input[0].to_string();
+        let code_path = input[1].to_string();
+        let min_players = input[2].parse::<usize>()?;
+        let max_players = input[3].parse::<usize>()?;
+        let cards = input
+            .iter()
+            .skip(4)
+            .map(|path| path.to_string())
+            .collect::<Vec<_>>();
+        let out = serde_json::to_string(&GameTemplate {
+            name: game_name,
+            max_players,
+            min_players,
+            cards: vec![],
+            card_paths: cards,
+            code_path,
+        })?;
+        fs::write(format!("{}{}.json", GAMES_DIR, input[0]), out)?;
+        CLI.get()
+            .unwrap()
+            .println(format!("Successfully created {}", input[0]).as_str());
+        Ok(())
+    }
+}
+
+struct CmdGames;
+
+impl CommandImpl for CmdGames {
+    type CTX = ();
+
+    fn execute(&self, _ctx: &Self::CTX, _input: &[&str]) -> anyhow::Result<()> {
+        let dir = fs::read_dir(GAMES_DIR)?;
+        let mut games = vec![];
+        for game in dir {
+            games.push(game?.path());
+        }
+        println!("Games ({}):", games.len());
+        for game_path in games {
+            let game_name = game_path.file_name().unwrap().to_str().unwrap().to_string();
+            let game: GameTemplate = serde_json::from_str(fs::read_to_string(game_path)?.as_str())?;
+            println!("{}: {:?}", game_name, game);
+        }
         Ok(())
     }
 }

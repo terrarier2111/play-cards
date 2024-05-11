@@ -32,7 +32,9 @@ pub fn player_name(args: Vec<RtRef>) -> Option<RtRef> {
     } else {
         args.first().unwrap().get_player().unwrap()
     };
-    Some(RtRef::string(Box::new(get_ctx().players[player.idx() as usize].name.clone())))
+    Some(RtRef::string(Box::new(
+        get_ctx().players[player.idx() as usize].name.clone(),
+    )))
 }
 
 pub fn create_inv(args: Vec<RtRef>) -> Option<RtRef> {

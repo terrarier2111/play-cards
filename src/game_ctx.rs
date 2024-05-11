@@ -7,7 +7,7 @@ use engine::{CardInventory, RtRef};
 use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct GameTemplate {
     pub name: String,
     pub max_players: usize,
@@ -18,7 +18,7 @@ pub struct GameTemplate {
     pub code_path: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct CardTemplate {
     pub name: String,
     pub ord: usize,
