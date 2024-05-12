@@ -81,7 +81,7 @@ pub type UHalf = u8;
 pub struct Function {
     pub params: &'static [RtType],
     pub var_len: bool,
-    pub name: String,
+    pub name: &'static str,
     pub call: fn(Vec<RtRef>) -> Option<RtRef>,
 }
 

@@ -18,7 +18,7 @@ pub fn run(path: &str, mut funcs: Vec<Function>) -> anyhow::Result<()> {
     println!("parsed ast: {:?}", ast);
     funcs.push(Function {
         params: &[RtType::String],
-        name: "print".to_string(),
+        name: "print",
         call: funcs::println,
         var_len: true,
     });

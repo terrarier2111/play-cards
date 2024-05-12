@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fs,
     num::{NonZero, NonZeroUsize},
+    path::Path,
     sync::{atomic::AtomicUsize, Arc},
 };
 
@@ -13,7 +14,10 @@ use clitty::{
     ui::{CLIBuilder, CmdLineInterface, PrintFallback},
 };
 use conc_once_cell::ConcurrentOnceCell;
+use engine::Function;
+use funcs::{next_player, player_cnt, player_name};
 use game_ctx::{CardTemplate, GameCtx, GameTemplate, PlayerDef};
+use image::DynamicImage;
 use swap_it::{SwapArcOption, SwapGuard};
 
 mod conc_once_cell;
@@ -25,9 +29,8 @@ static CTX: SwapArcOption<GameCtx> = SwapArcOption::new_empty();
 static CLI: ConcurrentOnceCell<CmdLineInterface<()>> = ConcurrentOnceCell::new();
 
 fn main() {
-    const PATH: &str = "./code/first.cgs";
-
     fs::create_dir_all(GAMES_DIR).unwrap();
+    fs::create_dir_all(CARDS_DIR).unwrap();
 
     // FIXME: add UI
     let window = CLIBuilder::new()
@@ -71,7 +74,7 @@ fn main() {
                         ty: CommandParamTy::UInt(CmdParamNumConstraints::None),
                     })
                     .required(CommandParam {
-                        name: "card paths",
+                        name: "card names",
                         ty: CommandParamTy::Unbound {
                             minimum: NonZero::new(1).unwrap(),
                             param: Box::new(CommandParamTy::String(CmdParamStrConstraints::None)),
@@ -80,6 +83,23 @@ fn main() {
             ),
         )
         .command(CommandBuilder::new("games", CmdGames))
+        .command(
+            CommandBuilder::new("mkcard", CmdCreateCard).params(
+                UsageBuilder::new()
+                    .required(CommandParam {
+                        name: "name",
+                        ty: CommandParamTy::String(CmdParamStrConstraints::None),
+                    })
+                    .required(CommandParam {
+                        name: "ordinal",
+                        ty: CommandParamTy::UInt(CmdParamNumConstraints::None),
+                    })
+                    .required(CommandParam {
+                        name: "image path",
+                        ty: CommandParamTy::String(CmdParamStrConstraints::None),
+                    }),
+            ),
+        )
         .fallback(Box::new(PrintFallback::new(
             "This command is not known".to_string(),
         )))
@@ -101,8 +121,14 @@ impl CommandImpl for CmdPlay {
     type CTX = ();
 
     fn execute(&self, _ctx: &Self::CTX, input: &[&str]) -> anyhow::Result<()> {
-        let mut game: GameTemplate =
-            serde_json::from_str(fs::read_to_string(input[0]).unwrap().as_str()).unwrap();
+        println!("path: {}", format!("{}{}.cgs", GAMES_DIR, input[0]));
+        println!("actual path: {:?}", Path::new("./").canonicalize().unwrap());
+        let mut game: GameTemplate = serde_json::from_str(
+            fs::read_to_string(format!("{}{}.json", GAMES_DIR, input[0]))
+                .unwrap()
+                .as_str(),
+        )
+        .unwrap();
         let cards: Vec<CardTemplate> = game
             .card_paths
             .iter()
@@ -130,7 +156,29 @@ impl CommandImpl for CmdPlay {
         };
         CTX.store(Arc::new(game));
         // start game
-        engine::run(&code_path, vec![])?;
+        engine::run(
+            &code_path,
+            vec![
+                Function {
+                    params: &[],
+                    var_len: false,
+                    name: "nextPlayer",
+                    call: next_player,
+                },
+                Function {
+                    params: &[],
+                    var_len: false,
+                    name: "playerCount",
+                    call: player_cnt,
+                },
+                Function {
+                    params: &[],
+                    var_len: true,
+                    name: "playerName",
+                    call: player_name,
+                },
+            ],
+        )?;
         Ok(())
     }
 }
@@ -185,6 +233,32 @@ impl CommandImpl for CmdGames {
             let game: GameTemplate = serde_json::from_str(fs::read_to_string(game_path)?.as_str())?;
             println!("{}: {:?}", game_name, game);
         }
+        Ok(())
+    }
+}
+
+const CARDS_DIR: &str = "./play_cards/cards/";
+
+struct CmdCreateCard;
+
+impl CommandImpl for CmdCreateCard {
+    type CTX = ();
+
+    fn execute(&self, _ctx: &Self::CTX, input: &[&str]) -> anyhow::Result<()> {
+        let name = input[0].to_string();
+        let ord = input[1].parse::<usize>()?;
+        let image_path = input[2].to_string();
+        fs::write(
+            format!("{}{}.json", CARDS_DIR, name),
+            serde_json::to_string_pretty(&CardTemplate {
+                name,
+                ord,
+                image_path,
+                image: Arc::new(DynamicImage::default()),
+                metadata: HashMap::new(),
+            })?,
+        )?;
+        println!("Created card {}", input[0]);
         Ok(())
     }
 }
