@@ -102,15 +102,29 @@ impl Parser {
             if self.try_eat(TokenKind::CloseBrace) {
                 break;
             }
-            params.push(self.try_parse_bin_op()?);
+            params.push(self.parse_ast_node()?);
             if !self.try_eat(TokenKind::Comma) {
                 if self.try_eat(TokenKind::CloseBrace) {
                     break;
                 }
-                return Err(error("Missing `)` to match `(` for function calls".to_string()));
+                return Err(error(format!("Missing `)` to match `(` for function calls, found {:?}", self.look_ahead())));
             }
         }
         Ok(params)
+    }
+
+    fn parse_ast_node(&mut self) -> anyhow::Result<AstNode> {
+        // handle function calls first
+        if matches!(self.look_ahead_by(0), Some(Token::Lit(..))) && self.look_ahead_by(1) == Some(Token::OpenBrace) {
+            let name = self.parse_lit().unwrap();
+            self.idx += 1;
+            Ok(AstNode::CallFunc {
+                name,
+                params: self.parse_func_params()?,
+            })
+        } else {
+            self.try_parse_bin_op()
+        }
     }
 
     fn parse_let(&mut self) -> anyhow::Result<Stmt> {
@@ -118,19 +132,7 @@ impl Parser {
         if !self.try_eat(TokenKind::Assign) {
             return Err(error("Missing `=` in let".to_string()));
         }
-        let val = {
-            // handle function calls first
-            if matches!(self.look_ahead_by(0), Some(Token::Lit(..))) && self.look_ahead_by(1) == Some(Token::OpenBrace) {
-                let name = self.parse_lit().unwrap();
-                self.idx += 1;
-                AstNode::CallFunc {
-                    name,
-                    params: self.parse_func_params()?,
-                }
-            } else {
-                self.try_parse_bin_op()?
-            }
-        };
+        let val = self.parse_ast_node()?;
         Ok(Stmt::DefineVar {
             name,
             val,
