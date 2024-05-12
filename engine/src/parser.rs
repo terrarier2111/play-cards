@@ -18,7 +18,11 @@ impl Parser {
     }
 
     fn look_ahead(&self) -> Option<Token> {
-        self.tokens.get(self.idx).cloned()
+        self.look_ahead_by(0)
+    }
+
+    fn look_ahead_by(&self, by: usize) -> Option<Token> {
+        self.tokens.get(self.idx + by).cloned()
     }
 
     fn try_eat(&mut self, token_kind: TokenKind) -> bool {
@@ -91,14 +95,45 @@ impl Parser {
         })
     }
 
+    fn parse_func_params(&mut self) -> anyhow::Result<Vec<AstNode>> {
+        // parse function call
+        let mut params = vec![];
+        loop {
+            if self.try_eat(TokenKind::CloseBrace) {
+                break;
+            }
+            params.push(self.try_parse_bin_op()?);
+            if !self.try_eat(TokenKind::Comma) {
+                if self.try_eat(TokenKind::CloseBrace) {
+                    break;
+                }
+                return Err(error("Missing `)` to match `(` for function calls".to_string()));
+            }
+        }
+        Ok(params)
+    }
+
     fn parse_let(&mut self) -> anyhow::Result<Stmt> {
         let name = self.parse_lit().unwrap();
         if !self.try_eat(TokenKind::Assign) {
             return Err(error("Missing `=` in let".to_string()));
         }
+        let val = {
+            // handle function calls first
+            if matches!(self.look_ahead_by(0), Some(Token::Lit(..))) && self.look_ahead_by(1) == Some(Token::OpenBrace) {
+                let name = self.parse_lit().unwrap();
+                self.idx += 1;
+                AstNode::CallFunc {
+                    name,
+                    params: self.parse_func_params()?,
+                }
+            } else {
+                self.try_parse_bin_op()?
+            }
+        };
         Ok(Stmt::DefineVar {
             name,
-            val: self.try_parse_bin_op()?,
+            val,
             reassign: false,
         })
     }
@@ -113,22 +148,9 @@ impl Parser {
                 match self.next() {
                     Some(Token::OpenBrace) => {
                         // parse function call
-                        let mut params = vec![];
-                        loop {
-                            if self.try_eat(TokenKind::CloseBrace) {
-                                break;
-                            }
-                            params.push(self.try_parse_bin_op()?);
-                            if !self.try_eat(TokenKind::Comma) {
-                                if self.try_eat(TokenKind::CloseBrace) {
-                                    break;
-                                }
-                                return Err(error("Missing `)` to match `(` for function calls".to_string()));
-                            }
-                        }
                         Ok(Stmt::CallFunc {
                             name: var,
-                            args: params,
+                            args: self.parse_func_params()?,
                         })
                     }
                     Some(Token::Assign) => {
@@ -147,7 +169,7 @@ impl Parser {
     }
 
     fn try_parse_bin_op(&mut self) -> anyhow::Result<AstNode> {
-        let mut lhs = match self.next() {
+        let lhs = match self.next() {
             Some(token) => match token {
                 Token::Exclam => {
                     return Ok(AstNode::UnaryOp {
