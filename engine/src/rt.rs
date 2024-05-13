@@ -1,6 +1,4 @@
-use std::{fmt::Debug, mem::transmute, num::NonZeroU64};
-
-use crate::nan_box::{NanBox64, TagBuilder};
+use std::{fmt::Debug, mem::transmute};
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct RtRef {
@@ -59,6 +57,13 @@ impl RtRef {
         }
     }
 
+    pub fn inventory(val: CardInventoryRef) -> Self {
+        Self {
+            ty: RtType::Inventory,
+            val: val.0 as usize,
+        }
+    }
+
     pub fn get_player(self) -> Option<Player> {
         match self.ty() {
             RtType::Player => Some(Player(self.dst() as usize as u64)),
@@ -66,15 +71,11 @@ impl RtRef {
         }
     }
 
-    pub fn get_inventory(self) -> Option<CardInventory> {
+    pub fn get_inventory(self) -> Option<CardInventoryRef> {
         match self.ty() {
             RtType::Inventory => Some({
                 let val = self.dst() as usize as u64;
-                if val & CardInventory::PLAYER_MARKER != 0 {
-                    CardInventory::Player(val & !CardInventory::PLAYER_MARKER)
-                } else {
-                    CardInventory::Other(val)
-                }
+                CardInventoryRef(val)
             }),
             _ => None,
         }
@@ -197,17 +198,10 @@ impl Player {
 
 }
 
-pub enum Visibility {
-    None,
-    Select(Vec<usize>),
-    All,
-}
+pub struct CardInventoryRef(pub u64);
 
-pub enum CardInventory {
-    Player(u64),
-    Other(u64),
-}
-
-impl CardInventory {
-    const PLAYER_MARKER: u64 = 1 << (u64::BITS - 1);
+pub struct CardInventory {
+    pub slots: u64,
+    pub vis: Option<Vec<Player>>,
+    pub cards: Vec<CardVal>,
 }

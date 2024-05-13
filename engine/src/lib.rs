@@ -1,6 +1,6 @@
 use std::fs;
 
-pub use crate::{bytecode::Function, rt::{RtType, RtRef, CardInventory, CardVal, Player}};
+pub use crate::{bytecode::Function, rt::{RtType, RtRef, CardInventory, CardInventoryRef, CardVal, Player}};
 
 mod ast;
 mod bytecode;

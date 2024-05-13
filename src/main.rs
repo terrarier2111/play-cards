@@ -14,8 +14,8 @@ use clitty::{
     ui::{CLIBuilder, CmdLineInterface, PrintFallback},
 };
 use conc_once_cell::ConcurrentOnceCell;
-use engine::Function;
-use funcs::{next_player, player_cnt, player_name};
+use engine::{Function, RtType};
+use funcs::{create_inv_global, create_inv_restricted, load_player_meta, next_player, player_cnt, player_name, store_player_meta};
 use game_ctx::{CardTemplate, GameCtx, GameTemplate, PlayerDef};
 use image::DynamicImage;
 use swap_it::{SwapArcOption, SwapGuard};
@@ -121,8 +121,6 @@ impl CommandImpl for CmdPlay {
     type CTX = ();
 
     fn execute(&self, _ctx: &Self::CTX, input: &[&str]) -> anyhow::Result<()> {
-        println!("path: {}", format!("{}{}.cgs", GAMES_DIR, input[0]));
-        println!("actual path: {:?}", Path::new("./").canonicalize().unwrap());
         let mut game: GameTemplate = serde_json::from_str(
             fs::read_to_string(format!("{}{}.json", GAMES_DIR, input[0]))
                 .unwrap()
@@ -177,6 +175,30 @@ impl CommandImpl for CmdPlay {
                     name: "playerName",
                     call: player_name,
                 },
+                Function {
+                    params: &[],
+                    var_len: true,
+                    name: "createInvGlobal",
+                    call: create_inv_global,
+                },
+                Function {
+                    params: &[],
+                    var_len: true,
+                    name: "createInvRestricted",
+                    call: create_inv_restricted,
+                },
+                Function {
+                    params: &[RtType::Player, RtType::String, /*any ty*/],
+                    var_len: true,
+                    name: "storePlayerMeta",
+                    call: store_player_meta,
+                },
+                Function {
+                    params: &[RtType::Player, RtType::String],
+                    var_len: false,
+                    name: "loadPlayerMeta",
+                    call: load_player_meta,
+                },
             ],
         )?;
         Ok(())
@@ -227,11 +249,11 @@ impl CommandImpl for CmdGames {
         for game in dir {
             games.push(game?.path());
         }
-        println!("Games ({}):", games.len());
+        CLI.get().unwrap().println(format!("Games ({}):", games.len()).as_str());
         for game_path in games {
             let game_name = game_path.file_name().unwrap().to_str().unwrap().to_string();
             let game: GameTemplate = serde_json::from_str(fs::read_to_string(game_path)?.as_str())?;
-            println!("{}: {:?}", game_name, game);
+            CLI.get().unwrap().println(format!("{}: {:?}", game_name, game).as_str());
         }
         Ok(())
     }
@@ -258,7 +280,7 @@ impl CommandImpl for CmdCreateCard {
                 metadata: HashMap::new(),
             })?,
         )?;
-        println!("Created card {}", input[0]);
+        CLI.get().unwrap().println(format!("Created card {}", input[0]).as_str());
         Ok(())
     }
 }

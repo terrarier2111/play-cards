@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{atomic::AtomicUsize, Arc, Mutex},
 };
 
 use engine::{CardInventory, RtRef};
@@ -31,15 +31,15 @@ pub struct CardTemplate {
 pub struct GameCtx {
     pub game: GameTemplate,
     pub players: Vec<PlayerDef>,
-    pub inventories: Vec<CardInventory>,
-    pub draw_stack: Vec<usize>, // list of card indices
+    pub inventories: Mutex<Vec<CardInventory>>,
+    pub draw_stack: Mutex<Vec<usize>>, // list of card indices
     pub meta: HashMap<String, RtRef>,
     pub curr_player: AtomicUsize,
 }
 
 pub struct PlayerDef {
     pub name: String,
-    pub inventories: Vec<CardInventory>,
-    pub meta: HashMap<String, RtRef>,
+    pub inventories: Mutex<Vec<CardInventory>>,
+    pub meta: Mutex<HashMap<String, RtRef>>,
     pub active: bool,
 }
