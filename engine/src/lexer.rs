@@ -70,7 +70,16 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
             '(' => Token::OpenBrace,
             ')' => Token::CloseBrace,
             ',' => Token::Comma,
-            '!' => Token::Exclam,
+            '!' => {
+                next_chr = iter.next();
+                match next_chr {
+                    Some('=') => Token::Ne,
+                    _ => {
+                        has_next = true;
+                        Token::Exclam
+                    }
+                }
+            },
             '+' => Token::Add,
             '-' => Token::Sub,
             '*' => Token::Mul,
