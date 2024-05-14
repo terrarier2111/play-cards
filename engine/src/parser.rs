@@ -159,11 +159,23 @@ impl Parser {
         Ok(Stmt::DefineFn { name, args, stmts: body })
     }
 
+    fn parse_return(&mut self) -> anyhow::Result<Stmt> {
+        let curr_idx = self.idx;
+        match self.parse_ast_node() {
+            Ok(val) => Ok(Stmt::Return { val: Some(val) }),
+            Err(_) => {
+                self.idx = curr_idx;
+                Ok(Stmt::Return { val: None })
+            },
+        }
+    }
+
     fn parse_stmt(&mut self) -> anyhow::Result<Stmt> {
         match self.next().unwrap() {
             Token::OpenCurly => todo!(),
             Token::While => self.parse_loop(),
             Token::If => self.parse_if(),
+            Token::Return => self.parse_return(),
             Token::Fn => self.parse_fn(),
             Token::Let => self.parse_let(),
             Token::Lit(var) => {
@@ -329,6 +341,9 @@ pub enum Stmt {
     Conditional {
         seq: Vec<(AstNode, Vec<Stmt>)>,
         fallback: Vec<Stmt>,
+    },
+    Return {
+        val: Option<AstNode>,
     },
 }
 

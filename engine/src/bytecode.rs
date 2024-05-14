@@ -240,6 +240,7 @@ impl<'a> Translator<'a> {
                     }
                 }
                 Stmt::DefineFn { name, args, stmts } => todo!(),
+                Stmt::Return { val } => todo!(),
             }
         }
         for var in curr_scope.vars {

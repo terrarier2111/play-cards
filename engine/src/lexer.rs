@@ -47,6 +47,7 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
                 "true" => Token::Bool(true),
                 "false" => Token::Bool(false),
                 "fn" => Token::Fn,
+                "return" => Token::Return,
                 "let" => Token::Let,
                 "while" => Token::While,
                 "if" => Token::If,
@@ -188,6 +189,7 @@ pub enum Token {
     OpenCurly,
     CloseCurly,
     Fn,
+    Return,
     Let,
     While,
     If,
@@ -230,6 +232,7 @@ impl Token {
             Token::Add => TokenKind::Add,
             Token::Sub => TokenKind::Sub,
             Token::Fn => TokenKind::Fn,
+            Token::Return => TokenKind::Return,
         }
     }
 }
@@ -257,6 +260,7 @@ pub enum TokenKind {
     OpenCurly,  // `{`
     CloseCurly, // `}`
     Fn,
+    Return,
     Let,
     While,
     If,
