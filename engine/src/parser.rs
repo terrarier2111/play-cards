@@ -1,20 +1,27 @@
-use std::{error::Error, fmt::{Debug, Display}, mem};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+    mem,
+};
 
 use crate::{
     ast::{AstNode, BinOpKind, UnaryOpKind},
-    lexer::{Token, TokenKind},
+    lexer::{Token, TokenKind, TokenVal},
     rt::RtRef,
 };
 
 struct Parser {
     idx: usize,
-    tokens: Vec<Token>,
+    tokens: Vec<TokenVal>,
 }
 
 impl Parser {
     fn next(&mut self) -> Option<Token> {
         self.idx += 1;
-        self.tokens.get(self.idx - 1).cloned()
+        self.tokens
+            .get(self.idx - 1)
+            .cloned()
+            .map(|token| token.token)
     }
 
     fn look_ahead(&self) -> Option<Token> {
@@ -22,14 +29,17 @@ impl Parser {
     }
 
     fn look_ahead_by(&self, by: usize) -> Option<Token> {
-        self.tokens.get(self.idx + by).cloned()
+        self.tokens
+            .get(self.idx + by)
+            .cloned()
+            .map(|token| token.token)
     }
 
     fn try_eat(&mut self, token_kind: TokenKind) -> bool {
         let ret = self
             .tokens
             .get(self.idx)
-            .map(|val| val.kind() == token_kind)
+            .map(|val| val.token.kind() == token_kind)
             .unwrap_or(false);
         if ret {
             self.idx += 1;
@@ -107,7 +117,10 @@ impl Parser {
                 if self.try_eat(TokenKind::CloseBrace) {
                     break;
                 }
-                return Err(error(format!("Missing `)` to match `(` for function calls, found {:?}", self.look_ahead())));
+                return Err(error(format!(
+                    "Missing `)` to match `(` for function calls, found {:?}",
+                    self.look_ahead()
+                )));
             }
         }
         Ok(params)
@@ -115,7 +128,9 @@ impl Parser {
 
     fn parse_ast_node(&mut self) -> anyhow::Result<AstNode> {
         // handle function calls first
-        if matches!(self.look_ahead_by(0), Some(Token::Lit(..))) && self.look_ahead_by(1) == Some(Token::OpenBrace) {
+        if matches!(self.look_ahead_by(0), Some(Token::Lit(..)))
+            && self.look_ahead_by(1) == Some(Token::OpenBrace)
+        {
             let name = self.parse_lit().unwrap();
             self.idx += 1;
             Ok(AstNode::CallFunc {
@@ -156,7 +171,11 @@ impl Parser {
         while !self.try_eat(TokenKind::CloseCurly) {
             body.push(self.parse_stmt()?);
         }
-        Ok(Stmt::DefineFn { name, args, stmts: body })
+        Ok(Stmt::DefineFn {
+            name,
+            args,
+            stmts: body,
+        })
     }
 
     fn parse_return(&mut self) -> anyhow::Result<Stmt> {
@@ -166,7 +185,7 @@ impl Parser {
             Err(_) => {
                 self.idx = curr_idx;
                 Ok(Stmt::Return { val: None })
-            },
+            }
         }
     }
 
@@ -195,10 +214,20 @@ impl Parser {
                             reassign: true,
                         })
                     }
-                    token => return Err(error(format!("Can't parse variable or function, expected `(` or `=`, but found `{:?}`", token))),
+                    token => {
+                        return Err(error(format!(
+                        "Can't parse variable or function, expected `(` or `=`, but found `{:?}`",
+                        token
+                    )))
+                    }
                 }
             }
-            token => return Err(error(format!("Didn't expect `{:?}` when parsing statement", token))),
+            token => {
+                return Err(error(format!(
+                    "Didn't expect `{:?}` when parsing statement",
+                    token
+                )))
+            }
         }
     }
 
@@ -223,7 +252,12 @@ impl Parser {
                 Token::CharSeq(val) => AstNode::Val(RtRef::string(Box::new(val))),
                 Token::Number(val) => AstNode::Val(RtRef::decimal(val)),
                 Token::Bool(val) => AstNode::Val(RtRef::bool(val)),
-                token => return Err(error(format!("found unexpected token {:?} when parsing binop", token))),
+                token => {
+                    return Err(error(format!(
+                        "found unexpected token {:?} when parsing binop",
+                        token
+                    )))
+                }
             },
             None => unreachable!(),
         };
@@ -294,12 +328,23 @@ impl Parser {
                     highest_idx = op.0;
                 }
             }
-            let lhs = if !nodes.is_empty() { nodes.remove(highest_idx) } else { finished_nodes.remove(0) };
-            let rhs = if !nodes.is_empty() { nodes.remove(highest_idx) } else { finished_nodes.remove(0) };
+            let lhs = if !nodes.is_empty() {
+                nodes.remove(highest_idx)
+            } else {
+                finished_nodes.remove(0)
+            };
+            let rhs = if !nodes.is_empty() {
+                nodes.remove(highest_idx)
+            } else {
+                finished_nodes.remove(0)
+            };
             let op = ops.remove(highest_idx);
-            finished_nodes.push(Box::new(AstNode::BinOp { lhs: lhs, rhs: rhs, op }));
+            finished_nodes.push(Box::new(AstNode::BinOp {
+                lhs: lhs,
+                rhs: rhs,
+                op,
+            }));
         }
-
 
         Ok(*finished_nodes.pop().unwrap())
     }
@@ -309,7 +354,7 @@ fn error(val: String) -> anyhow::Error {
     anyhow::Error::new(ParseError(val))
 }
 
-pub fn parse(tokens: Vec<Token>) -> anyhow::Result<Vec<Stmt>> {
+pub fn parse(tokens: Vec<TokenVal>) -> anyhow::Result<Vec<Stmt>> {
     let mut parser = Parser { idx: 0, tokens };
     let mut stmts = vec![];
     while parser.idx < parser.tokens.len() {

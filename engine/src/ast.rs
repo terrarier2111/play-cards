@@ -90,7 +90,6 @@ pub enum BinOpKind {
 }
 
 impl BinOpKind {
-
     pub fn priority(&self) -> usize {
         match self {
             BinOpKind::Add => 1,
@@ -108,7 +107,6 @@ impl BinOpKind {
             BinOpKind::Le => 0,
         }
     }
-
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]

@@ -187,7 +187,6 @@ pub struct CardVal(u64);
 pub struct Player(u64);
 
 impl Player {
-
     pub fn new(idx: u64) -> Self {
         Self(idx)
     }
@@ -195,7 +194,6 @@ impl Player {
     pub fn idx(self) -> u64 {
         self.0
     }
-
 }
 
 pub struct CardInventoryRef(pub u64);

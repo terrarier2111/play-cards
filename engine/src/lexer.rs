@@ -4,12 +4,18 @@ use std::{
     str::Chars,
 };
 
-pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
+use crate::span::Span;
+
+pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
     let mut tokens = vec![];
     let mut buffer = String::new();
-    let mut iter = src.chars();
+    let mut iter = LexingIter {
+        inner: src.chars(),
+        idx: 0,
+    };
     let mut next_chr = iter.next();
     while let Some(chr) = next_chr {
+        let start_idx = iter.idx;
         if chr == ' ' || chr == '\r' || chr == '\n' {
             next_chr = iter.next();
             continue;
@@ -30,9 +36,10 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
             if dots > 1 {
                 return Err(anyhow::Error::new(TooManyDots));
             }
-            tokens.push(Token::Number(
-                core::mem::take(&mut buffer).parse::<f64>().unwrap(),
-            ));
+            tokens.push(TokenVal {
+                token: Token::Number(core::mem::take(&mut buffer).parse::<f64>().unwrap()),
+                span: Span::new(start_idx, iter.idx),
+            });
             continue;
         }
         if chr.is_alphabetic() {
@@ -54,13 +61,19 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
                 "else" => Token::Else,
                 _ => Token::Lit(lit),
             };
-            tokens.push(token);
+            tokens.push(TokenVal {
+                token,
+                span: Span::new(start_idx, iter.idx),
+            });
             continue;
         }
         if chr == '"' {
             collect_string_until(&mut iter, |chr| chr == '"', &mut buffer);
             next_chr = iter.next();
-            tokens.push(Token::CharSeq(core::mem::take(&mut buffer)));
+            tokens.push(TokenVal {
+                token: Token::CharSeq(core::mem::take(&mut buffer)),
+                span: Span::new(start_idx, iter.idx),
+            });
             continue;
         }
         let mut has_next = false;
@@ -79,7 +92,7 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
                         Token::Exclam
                     }
                 }
-            },
+            }
             '+' => Token::Add,
             '-' => Token::Sub,
             '*' => Token::Mul,
@@ -153,7 +166,10 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
             }
             _ => return Err(anyhow::Error::from(UnknownToken(chr))),
         };
-        tokens.push(token);
+        tokens.push(TokenVal {
+            token,
+            span: Span::new(start_idx, iter.idx - (if has_next { 1 } else { 0 })),
+        });
         if !has_next {
             next_chr = iter.next();
         }
@@ -161,8 +177,25 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<Token>> {
     Ok(tokens)
 }
 
-fn collect_string_until<F: FnMut(char) -> bool>(
-    src: &mut Chars<'_>,
+struct LexingIter<'a> {
+    inner: Chars<'a>,
+    idx: usize,
+}
+
+impl<'a> Iterator for LexingIter<'a> {
+    type Item = char;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = self.inner.next();
+        if ret.is_some() {
+            self.idx += 1;
+        }
+        ret
+    }
+}
+
+fn collect_string_until<F: FnMut(char) -> bool, I: Iterator<Item = char>>(
+    src: &mut I,
     mut until: F,
     buffer: &mut String,
 ) -> Option<char> {
@@ -173,6 +206,12 @@ fn collect_string_until<F: FnMut(char) -> bool>(
         buffer.push(chr);
     }
     None
+}
+
+#[derive(Clone, Debug)]
+pub struct TokenVal {
+    pub token: Token,
+    pub span: Span,
 }
 
 #[derive(Clone, PartialEq, Debug)]

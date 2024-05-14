@@ -1,6 +1,9 @@
 use std::fs;
 
-pub use crate::{bytecode::Function, rt::{RtType, RtRef, CardInventory, CardInventoryRef, CardVal, Player}};
+pub use crate::{
+    bytecode::Function,
+    rt::{CardInventory, CardInventoryRef, CardVal, Player, RtRef, RtType},
+};
 
 mod ast;
 mod bytecode;
@@ -9,6 +12,7 @@ mod lexer;
 mod nan_box;
 mod parser;
 mod rt;
+mod span;
 mod vm;
 
 pub fn run(path: &str, mut funcs: Vec<Function>) -> anyhow::Result<()> {
