@@ -239,6 +239,7 @@ impl<'a> Translator<'a> {
                         });
                     }
                 }
+                Stmt::DefineFn { name, args, stmts } => todo!(),
             }
         }
         for var in curr_scope.vars {

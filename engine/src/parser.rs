@@ -140,11 +140,31 @@ impl Parser {
         })
     }
 
+    fn parse_fn(&mut self) -> anyhow::Result<Stmt> {
+        let name = self.parse_lit().unwrap();
+        if !self.try_eat(TokenKind::OpenBrace) {
+            return Err(error("Can't find `(` in function definition".to_string()));
+        }
+        let mut args = vec![];
+        while !self.try_eat(TokenKind::CloseBrace) {
+            args.push(self.parse_lit().unwrap());
+        }
+        if !self.try_eat(TokenKind::OpenCurly) {
+            return Err(error("Can't find `{` in function definition".to_string()));
+        }
+        let mut body = vec![];
+        while !self.try_eat(TokenKind::CloseCurly) {
+            body.push(self.parse_stmt()?);
+        }
+        Ok(Stmt::DefineFn { name, args, stmts: body })
+    }
+
     fn parse_stmt(&mut self) -> anyhow::Result<Stmt> {
         match self.next().unwrap() {
             Token::OpenCurly => todo!(),
             Token::While => self.parse_loop(),
             Token::If => self.parse_if(),
+            Token::Fn => self.parse_fn(),
             Token::Let => self.parse_let(),
             Token::Lit(var) => {
                 match self.next() {
@@ -292,6 +312,11 @@ pub enum Stmt {
         name: String,
         val: AstNode,
         reassign: bool,
+    },
+    DefineFn {
+        name: String,
+        args: Vec<String>,
+        stmts: Vec<Stmt>,
     },
     CallFunc {
         name: String,
