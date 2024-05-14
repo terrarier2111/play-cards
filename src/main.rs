@@ -3,7 +3,7 @@ use std::{
     fs,
     num::{NonZero, NonZeroUsize},
     path::Path,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{atomic::AtomicUsize, Arc, Mutex},
 };
 
 use clitty::{
@@ -15,7 +15,7 @@ use clitty::{
 };
 use conc_once_cell::ConcurrentOnceCell;
 use engine::{Function, RtType};
-use funcs::{create_inv_global, create_inv_restricted, load_player_meta, next_player, player_cnt, player_name, store_player_meta};
+use funcs::{create_inv_global, create_inv_restricted, load_meta, next_player, player_cnt, player_name, store_meta};
 use game_ctx::{CardTemplate, GameCtx, GameTemplate, PlayerDef};
 use image::DynamicImage;
 use swap_it::{SwapArcOption, SwapGuard};
@@ -142,13 +142,13 @@ impl CommandImpl for CmdPlay {
                 .skip(1)
                 .map(|player| PlayerDef {
                     name: player.to_string(),
-                    inventories: vec![],
-                    meta: HashMap::new(),
+                    inventories: Mutex::new(vec![]),
+                    meta: Mutex::new(HashMap::new()),
                     active: true,
                 })
                 .collect::<Vec<_>>(),
-            inventories: vec![],
-            draw_stack: vec![],
+            inventories: Mutex::new(vec![]),
+            draw_stack: Mutex::new(vec![]),
             meta: HashMap::new(),
             curr_player: AtomicUsize::new(0),
         };
@@ -188,16 +188,16 @@ impl CommandImpl for CmdPlay {
                     call: create_inv_restricted,
                 },
                 Function {
-                    params: &[RtType::Player, RtType::String, /*any ty*/],
+                    params: &[],
                     var_len: true,
-                    name: "storePlayerMeta",
-                    call: store_player_meta,
+                    name: "storeMeta",
+                    call: store_meta,
                 },
                 Function {
-                    params: &[RtType::Player, RtType::String],
-                    var_len: false,
-                    name: "loadPlayerMeta",
-                    call: load_player_meta,
+                    params: &[],
+                    var_len: true,
+                    name: "loadMeta",
+                    call: load_meta,
                 },
             ],
         )?;

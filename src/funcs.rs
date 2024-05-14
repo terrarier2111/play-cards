@@ -58,16 +58,27 @@ pub fn create_inv_restricted(args: Vec<RtRef>) -> Option<RtRef> {
     Some(RtRef::inventory(CardInventoryRef((get_ctx().inventories.lock().unwrap().len() - 1) as u64)))
 }
 
-pub fn store_player_meta(args: Vec<RtRef>) -> Option<RtRef> {
-    let player = args[0].get_player().unwrap();
-    let meta_name = args[1].get_string().unwrap();
-    let meta_val = args[2];
-    get_ctx().players[player.idx() as usize].meta.lock().unwrap().insert(meta_name.clone(), meta_val);
+pub fn store_meta(args: Vec<RtRef>) -> Option<RtRef> {
+    assert!(args.len() < 4 && args.len() > 1);
+    if args.len() == 3 {
+        let player = args[0].get_player().unwrap();
+        let meta_name = args[1].get_string().unwrap();
+        let meta_val = args[2];
+        get_ctx().players[player.idx() as usize].meta.lock().unwrap().insert(meta_name.clone(), meta_val);
+    } else {
+        // FIXME: insert into game
+    }
     None
 }
 
-pub fn load_player_meta(args: Vec<RtRef>) -> Option<RtRef> {
-    let player = args[0].get_player().unwrap();
-    let meta_name = args[1].get_string().unwrap();
-    get_ctx().players[player.idx() as usize].meta.lock().unwrap().get(meta_name).cloned()
+pub fn load_meta(args: Vec<RtRef>) -> Option<RtRef> {
+    assert!(args.len() < 4 && args.len() > 1);
+    if args.len() == 2 {
+        let player = args[0].get_player().unwrap();
+        let meta_name = args[1].get_string().unwrap();
+        get_ctx().players[player.idx() as usize].meta.lock().unwrap().get(meta_name).cloned()
+    } else {
+        // FIXME: load from game
+        todo!()
+    }
 }
