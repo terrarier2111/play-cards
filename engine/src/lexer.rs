@@ -1,10 +1,6 @@
-use std::{
-    error::Error,
-    fmt::{Debug, Display, Write},
-    str::Chars,
-};
+use std::{fmt::Debug, str::Chars};
 
-use crate::span::Span;
+use crate::{diagnostic_builder_spanned, span::Span};
 
 pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
     let mut tokens = vec![];
@@ -34,7 +30,10 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
                 &mut buffer,
             );
             if dots > 1 {
-                return Err(anyhow::Error::new(TooManyDots));
+                return diagnostic_builder_spanned!(
+                    "Found more than 1 dot while parsing number",
+                    Span::single_token(iter.idx)
+                );
             }
             tokens.push(TokenVal {
                 token: Token::Number(core::mem::take(&mut buffer).parse::<f64>().unwrap()),
@@ -150,8 +149,17 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
                 next_chr = iter.next();
                 match next_chr {
                     Some('&') => Token::And,
-                    _ => {
-                        return Err(anyhow::Error::from(UnknownToken(chr))); // FIXME: improve diagnostics
+                    Some(chr) => {
+                        return diagnostic_builder_spanned!(
+                            format!("Expected `&` but found `{chr}`"),
+                            Span::single_token(iter.idx)
+                        )
+                    }
+                    None => {
+                        return diagnostic_builder_spanned!(
+                            "Expected `&` but found nothing",
+                            Span::single_token(iter.idx)
+                        )
                     }
                 }
             }
@@ -159,12 +167,26 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
                 next_chr = iter.next();
                 match next_chr {
                     Some('|') => Token::Or,
-                    _ => {
-                        return Err(anyhow::Error::from(UnknownToken(chr))); // FIXME: improve diagnostics
+                    Some(chr) => {
+                        return diagnostic_builder_spanned!(
+                            format!("Expected `|` but found `{chr}`"),
+                            Span::single_token(iter.idx)
+                        )
+                    }
+                    None => {
+                        return diagnostic_builder_spanned!(
+                            "Expected `|` but found nothing",
+                            Span::single_token(iter.idx)
+                        )
                     }
                 }
             }
-            _ => return Err(anyhow::Error::from(UnknownToken(chr))),
+            _ => {
+                return diagnostic_builder_spanned!(
+                    format!("Unexpected character `{chr}`"),
+                    Span::single_token(iter.idx)
+                )
+            }
         };
         tokens.push(TokenVal {
             token,
@@ -317,38 +339,4 @@ pub enum TokenKind {
     CharSeq,
     Number,
     Bool,
-}
-
-pub struct UnknownToken(char);
-
-impl Error for UnknownToken {}
-
-impl Display for UnknownToken {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self, f)
-    }
-}
-
-impl Debug for UnknownToken {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("found unknown character ")?;
-        f.write_char(self.0)?;
-        f.write_str(" while lexing program")
-    }
-}
-
-pub struct TooManyDots;
-
-impl Error for TooManyDots {}
-
-impl Display for TooManyDots {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Found more than 1 dot while parsing number")
-    }
-}
-
-impl Debug for TooManyDots {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self, f)
-    }
 }
