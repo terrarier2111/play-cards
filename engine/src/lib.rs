@@ -7,6 +7,7 @@ pub use crate::{
 
 mod ast;
 mod bytecode;
+mod error;
 mod funcs;
 mod lexer;
 mod nan_box;

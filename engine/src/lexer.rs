@@ -38,7 +38,7 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
             }
             tokens.push(TokenVal {
                 token: Token::Number(core::mem::take(&mut buffer).parse::<f64>().unwrap()),
-                span: Span::new(start_idx, iter.idx),
+                span: Span::multi_token(start_idx, iter.idx),
             });
             continue;
         }
@@ -63,7 +63,7 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
             };
             tokens.push(TokenVal {
                 token,
-                span: Span::new(start_idx, iter.idx),
+                span: Span::multi_token(start_idx, iter.idx),
             });
             continue;
         }
@@ -72,7 +72,7 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
             next_chr = iter.next();
             tokens.push(TokenVal {
                 token: Token::CharSeq(core::mem::take(&mut buffer)),
-                span: Span::new(start_idx, iter.idx),
+                span: Span::multi_token(start_idx, iter.idx),
             });
             continue;
         }
@@ -168,7 +168,7 @@ pub fn lex(src: &str) -> anyhow::Result<Vec<TokenVal>> {
         };
         tokens.push(TokenVal {
             token,
-            span: Span::new(start_idx, iter.idx - (if has_next { 1 } else { 0 })),
+            span: Span::multi_token(start_idx, iter.idx - (if has_next { 1 } else { 0 })),
         });
         if !has_next {
             next_chr = iter.next();

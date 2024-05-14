@@ -1,13 +1,14 @@
 use std::{
     error::Error,
     fmt::{Debug, Display},
-    mem,
 };
 
 use crate::{
     ast::{AstNode, BinOpKind, UnaryOpKind},
+    diagnostic_builder,
     lexer::{Token, TokenKind, TokenVal},
     rt::RtRef,
+    span::Span,
 };
 
 struct Parser {
@@ -58,7 +59,7 @@ impl Parser {
     fn parse_loop(&mut self) -> anyhow::Result<Stmt> {
         let cond = self.try_parse_bin_op()?;
         if !self.try_eat(TokenKind::OpenCurly) {
-            return Err(error("Missing `{` in loop".to_string()));
+            return diagnostic_builder!("Missing `{` in loop");
         }
         let mut stmts = vec![];
         while !self.try_eat(TokenKind::CloseCurly) {
@@ -76,7 +77,7 @@ impl Parser {
         loop {
             let cond = self.try_parse_bin_op()?;
             if !self.try_eat(TokenKind::OpenCurly) {
-                return Err(error("Missing `{` in if".to_string()));
+                return diagnostic_builder!("Missing `{` in if");
             }
             let mut stmts = vec![];
             while !self.try_eat(TokenKind::CloseCurly) {
@@ -88,7 +89,7 @@ impl Parser {
                     continue;
                 }
                 if !self.try_eat(TokenKind::OpenCurly) {
-                    return Err(error("Missing `{` in else".to_string()));
+                    return diagnostic_builder!("Missing `{` in else");
                 }
                 let mut stmts = vec![];
                 while !self.try_eat(TokenKind::CloseCurly) {
@@ -117,10 +118,10 @@ impl Parser {
                 if self.try_eat(TokenKind::CloseBrace) {
                     break;
                 }
-                return Err(error(format!(
+                return diagnostic_builder!(format!(
                     "Missing `)` to match `(` for function calls, found {:?}",
                     self.look_ahead()
-                )));
+                ));
             }
         }
         Ok(params)
@@ -145,7 +146,7 @@ impl Parser {
     fn parse_let(&mut self) -> anyhow::Result<Stmt> {
         let name = self.parse_lit().unwrap();
         if !self.try_eat(TokenKind::Assign) {
-            return Err(error("Missing `=` in let".to_string()));
+            return diagnostic_builder!("Missing `=` in let");
         }
         let val = self.parse_ast_node()?;
         Ok(Stmt::DefineVar {
@@ -158,14 +159,14 @@ impl Parser {
     fn parse_fn(&mut self) -> anyhow::Result<Stmt> {
         let name = self.parse_lit().unwrap();
         if !self.try_eat(TokenKind::OpenBrace) {
-            return Err(error("Can't find `(` in function definition".to_string()));
+            return diagnostic_builder!("Can't find `(` in function definition".to_string());
         }
         let mut args = vec![];
         while !self.try_eat(TokenKind::CloseBrace) {
             args.push(self.parse_lit().unwrap());
         }
         if !self.try_eat(TokenKind::OpenCurly) {
-            return Err(error("Can't find `{` in function definition".to_string()));
+            return diagnostic_builder!("Can't find `{` in function definition");
         }
         let mut body = vec![];
         while !self.try_eat(TokenKind::CloseCurly) {
@@ -215,18 +216,18 @@ impl Parser {
                         })
                     }
                     token => {
-                        return Err(error(format!(
+                        return diagnostic_builder!(format!(
                         "Can't parse variable or function, expected `(` or `=`, but found `{:?}`",
                         token
-                    )))
+                    ))
                     }
                 }
             }
             token => {
-                return Err(error(format!(
+                return diagnostic_builder!(format!(
                     "Didn't expect `{:?}` when parsing statement",
                     token
-                )))
+                ))
             }
         }
     }
@@ -243,7 +244,7 @@ impl Parser {
                 Token::OpenBrace => {
                     let op = self.try_parse_bin_op()?;
                     if !self.try_eat(TokenKind::CloseBrace) {
-                        return Err(error("Missing `)` to match `(`".to_string()));
+                        return diagnostic_builder!("Missing `)` to match `(`");
                     }
                     op
                 }
@@ -253,10 +254,10 @@ impl Parser {
                 Token::Number(val) => AstNode::Val(RtRef::decimal(val)),
                 Token::Bool(val) => AstNode::Val(RtRef::bool(val)),
                 token => {
-                    return Err(error(format!(
+                    return diagnostic_builder!(format!(
                         "found unexpected token {:?} when parsing binop",
                         token
-                    )))
+                    ))
                 }
             },
             None => unreachable!(),
@@ -350,10 +351,6 @@ impl Parser {
     }
 }
 
-fn error(val: String) -> anyhow::Error {
-    anyhow::Error::new(ParseError(val))
-}
-
 pub fn parse(tokens: Vec<TokenVal>) -> anyhow::Result<Vec<Stmt>> {
     let mut parser = Parser { idx: 0, tokens };
     let mut stmts = vec![];
@@ -392,7 +389,7 @@ pub enum Stmt {
     },
 }
 
-pub struct ParseError(String);
+pub struct ParseError(String, Option<Span>);
 
 impl Error for ParseError {}
 
