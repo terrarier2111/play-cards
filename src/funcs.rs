@@ -44,18 +44,26 @@ pub fn create_inv_global(args: Vec<RtRef>) -> Option<RtRef> {
         vis: None,
         cards: vec![],
     });
-    Some(RtRef::inventory(CardInventoryRef((get_ctx().inventories.lock().unwrap().len() - 1) as u64)))
+    Some(RtRef::inventory(CardInventoryRef(
+        (get_ctx().inventories.lock().unwrap().len() - 1) as u64,
+    )))
 }
 
 pub fn create_inv_restricted(args: Vec<RtRef>) -> Option<RtRef> {
     let slots = args[0].get_decimal().unwrap();
-    let players = args.iter().skip(1).map(|val| val.get_player().unwrap()).collect::<Vec<_>>();
+    let players = args
+        .iter()
+        .skip(1)
+        .map(|val| val.get_player().unwrap())
+        .collect::<Vec<_>>();
     get_ctx().inventories.lock().unwrap().push(CardInventory {
         slots: slots as i64 as u64,
         vis: Some(players),
         cards: vec![],
     });
-    Some(RtRef::inventory(CardInventoryRef((get_ctx().inventories.lock().unwrap().len() - 1) as u64)))
+    Some(RtRef::inventory(CardInventoryRef(
+        (get_ctx().inventories.lock().unwrap().len() - 1) as u64,
+    )))
 }
 
 pub fn store_meta(args: Vec<RtRef>) -> Option<RtRef> {
@@ -64,7 +72,11 @@ pub fn store_meta(args: Vec<RtRef>) -> Option<RtRef> {
         let player = args[0].get_player().unwrap();
         let meta_name = args[1].get_string().unwrap();
         let meta_val = args[2];
-        get_ctx().players[player.idx() as usize].meta.lock().unwrap().insert(meta_name.clone(), meta_val);
+        get_ctx().players[player.idx() as usize]
+            .meta
+            .lock()
+            .unwrap()
+            .insert(meta_name.clone(), meta_val);
     } else {
         // FIXME: insert into game
     }
@@ -76,9 +88,18 @@ pub fn load_meta(args: Vec<RtRef>) -> Option<RtRef> {
     if args.len() == 2 {
         let player = args[0].get_player().unwrap();
         let meta_name = args[1].get_string().unwrap();
-        get_ctx().players[player.idx() as usize].meta.lock().unwrap().get(meta_name).cloned()
+        get_ctx().players[player.idx() as usize]
+            .meta
+            .lock()
+            .unwrap()
+            .get(meta_name)
+            .cloned()
     } else {
         // FIXME: load from game
         todo!()
     }
+}
+
+pub fn player_play(args: Vec<RtRef>) -> Option<RtRef> {
+    todo!()
 }

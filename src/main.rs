@@ -15,7 +15,10 @@ use clitty::{
 };
 use conc_once_cell::ConcurrentOnceCell;
 use engine::{Function, RtType};
-use funcs::{create_inv_global, create_inv_restricted, load_meta, next_player, player_cnt, player_name, store_meta};
+use funcs::{
+    create_inv_global, create_inv_restricted, load_meta, next_player, player_cnt, player_name,
+    player_play, store_meta,
+};
 use game_ctx::{CardTemplate, GameCtx, GameTemplate, PlayerDef};
 use image::DynamicImage;
 use swap_it::{SwapArcOption, SwapGuard};
@@ -199,6 +202,12 @@ impl CommandImpl for CmdPlay {
                     name: "loadMeta",
                     call: load_meta,
                 },
+                Function {
+                    params: &[],
+                    var_len: false,
+                    name: "playerPlay",
+                    call: player_play,
+                },
             ],
         )?;
         Ok(())
@@ -249,11 +258,15 @@ impl CommandImpl for CmdGames {
         for game in dir {
             games.push(game?.path());
         }
-        CLI.get().unwrap().println(format!("Games ({}):", games.len()).as_str());
+        CLI.get()
+            .unwrap()
+            .println(format!("Games ({}):", games.len()).as_str());
         for game_path in games {
             let game_name = game_path.file_name().unwrap().to_str().unwrap().to_string();
             let game: GameTemplate = serde_json::from_str(fs::read_to_string(game_path)?.as_str())?;
-            CLI.get().unwrap().println(format!("{}: {:?}", game_name, game).as_str());
+            CLI.get()
+                .unwrap()
+                .println(format!("{}: {:?}", game_name, game).as_str());
         }
         Ok(())
     }
@@ -280,7 +293,9 @@ impl CommandImpl for CmdCreateCard {
                 metadata: HashMap::new(),
             })?,
         )?;
-        CLI.get().unwrap().println(format!("Created card {}", input[0]).as_str());
+        CLI.get()
+            .unwrap()
+            .println(format!("Created card {}", input[0]).as_str());
         Ok(())
     }
 }
