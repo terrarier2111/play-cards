@@ -64,6 +64,13 @@ impl RtRef {
         }
     }
 
+    pub fn function(idx: usize) -> Self {
+        Self {
+            ty: RtType::Function,
+            val: idx,
+        }
+    }
+
     pub fn get_player(self) -> Option<Player> {
         match self.ty() {
             RtType::Player => Some(Player(self.dst() as usize as u64)),
@@ -139,6 +146,7 @@ impl RtRef {
             RtType::None => "Null".to_string(),
             RtType::Bool => unsafe { transmute::<_, bool>(self.val as u8) }.to_string(),
             RtType::String => unsafe { (self.val as *const String).as_ref().unwrap() }.clone(),
+            RtType::Function => todo!(),
             RtType::Player => todo!(),
             RtType::Inventory => todo!(),
             RtType::Cards => todo!(),
@@ -173,9 +181,10 @@ pub enum RtType {
     None = 1,
     Bool = 2,
     String = 3,
-    Player = 4,
-    Inventory = 5,
-    Cards = 6,
+    Function = 4,
+    Player = 5,
+    Inventory = 6,
+    Cards = 7,
 }
 
 #[derive(Clone, Copy, PartialEq)]

@@ -20,7 +20,7 @@ pub fn run(path: &str, mut funcs: Vec<Function>) -> anyhow::Result<()> {
     if !funcs.iter().any(|fun| fun.name == "println") {
         funcs.push(Function {
             params: &[RtType::String],
-            name: "print",
+            name: "println",
             call: funcs::println,
             var_len: true,
         });

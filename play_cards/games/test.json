@@ -1,1 +1,1 @@
-{"name":"test","max_players":4,"min_players":2,"card_paths":["./play_cards/cards/basic.json"],"code_path":"./play_cards/games/test_code.cgs"}
+{"name":"test","max_players":4,"min_players":2,"card_paths":["./play_cards/cards/basic.json"],"code_path":"./play_cards/games/test.cgs"}

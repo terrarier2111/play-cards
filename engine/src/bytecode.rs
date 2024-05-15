@@ -259,10 +259,12 @@ impl<'a> Translator<'a> {
                     if !code.0.fns.is_empty() {
                         panic!("Nested function definitions are disallowed");
                     }
+                    let internal_fn_idx = self.internal_fns.len();
                     self.internal_fns.insert(name.clone(), InternalFn {
                         code: code.0.main,
                         params: args.clone(),
                         call_resolution: code.1,
+                        func_idx: internal_fn_idx,
                     });
                 },
                 Stmt::Return { val } => {
@@ -446,7 +448,19 @@ impl<'a> Translator<'a> {
                 self.stack_idx += 1;
                 self.stack_idx - 1
             }
-            AstNode::Var { name } => *self.vars.get(name).unwrap().last().unwrap(),
+            AstNode::Var { name } => {
+                if let Some(val) = self.vars.get(name) {
+                    return *val.last().unwrap();
+                }
+                if let Some(val) = self.internal_fns.get(name) {
+                    self.code.push(ByteCode::Push { val: RtRef::function(val.func_idx) });
+                    *pops += 1;
+                    self.stack_idx += 1;
+                    return self.stack_idx - 1;
+                }
+
+                panic!("No variable or function named \"{}\"", name);
+            },
             AstNode::UnaryOp { val, op } => match *op {
                 crate::ast::UnaryOpKind::Not => {
                     todo!()
@@ -462,7 +476,7 @@ impl<'a> Translator<'a> {
             .iter()
             .enumerate()
             .find(|(_, val)| &val.name == fn_name)
-            .unwrap()
+            .expect(format!("Function \"{fn_name}\" doesn't exist").as_str())
             .0;
         fn_idx
     }
@@ -519,6 +533,7 @@ struct TranslationOutput {
 }
 
 struct InternalFn {
+    func_idx: usize,
     code: Vec<ByteCode>,
     params: Vec<String>,
     call_resolution: Vec<ResolvableCall>,
