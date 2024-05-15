@@ -9,6 +9,6 @@ pub fn println(args: Vec<RtRef>) -> Option<RtRef> {
         fmt.push_str(&args[idx + 1].to_string());
         fmt.push_str(val);
     }
-    CLIprintln!("{}", fmt);
+    println!("{}", fmt);
     None
 }

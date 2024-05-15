@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use thin_vec::{thin_vec, ThinVec};
 
@@ -69,6 +69,12 @@ pub enum ByteCode {
         arg2_idx: UHalf,
         expected: Ordering,
     },
+    Return {
+        has_val: bool,
+    },
+    CallLocal {
+        relative_off: isize,
+    },
 }
 
 #[cfg(target_pointer_width = "64")]
@@ -89,11 +95,20 @@ struct Scope {
     vars: Vec<String>,
 }
 
+struct ResolvableCall {
+    args: usize,
+    name: String,
+    location_idx: usize,
+}
+
 struct Translator<'a> {
     code: Vec<ByteCode>,
+    internal_fns: HashMap<String, InternalFn>,
+    local_fns: &'a HashMap<String, bool>,
     fns: &'a Vec<Function>,
     stack_idx: usize,
     vars: HashMap<String, Vec<usize>>,
+    call_resolution: Vec<ResolvableCall>,
 }
 
 impl<'a> Translator<'a> {
@@ -239,12 +254,31 @@ impl<'a> Translator<'a> {
                         });
                     }
                 }
-                Stmt::DefineFn { name, args, stmts } => todo!(),
-                Stmt::Return { val } => todo!(),
+                Stmt::DefineFn { name, args, stmts } => {
+                    let code = translate_unit(stmts, self.fns, self.local_fns);
+                    if !code.0.fns.is_empty() {
+                        panic!("Nested function definitions are disallowed");
+                    }
+                    self.internal_fns.insert(name.clone(), InternalFn {
+                        code: code.0.main,
+                        params: args.clone(),
+                        call_resolution: code.1,
+                    });
+                },
+                Stmt::Return { val } => {
+                    if let Some(val) = val {
+                        let mut _pops = 0;
+                        self.translate_node(val, &mut _pops);
+                    }
+                    self.code.push(ByteCode::Return { has_val: val.is_some() });
+                    // discard all remaining code as it won't ever be executed and thus can be considered dead code
+                    break;
+                },
             }
         }
         for var in curr_scope.vars {
-            // FIXME: this is buggy as if there are multiple variables with the same name, it will come to collisions (if they are in different scopes)
+            // this doesn't necessarily delete all definitions of a certain variable as in case there are multiple variables with the same name,
+            // it would come to collisions (if they are in different scopes)
             self.vars.get_mut(&var).unwrap().pop();
         }
         let stack_delta = self.stack_idx - initial_stack_idx;
@@ -258,6 +292,30 @@ impl<'a> Translator<'a> {
     fn translate_node(&mut self, node: &AstNode, pops: &mut usize) -> usize {
         match node {
             AstNode::CallFunc { name, params } => {
+                if self.local_fns.contains_key(name) {
+                    let mut call_pops = 0;
+                    let mut indices = thin_vec![];
+                    for param in params {
+                        indices.push(self.translate_node(param, &mut call_pops) as UHalf);
+                    }
+
+                    // push a placeholder instruction to be replaced later on
+                    self.code.push(ByteCode::CallLocal {
+                        relative_off: 0,
+                    }); // FIXME: should we push val?
+
+                    let offset = if *self.local_fns.get(name).unwrap() { 1 } else { 0 };
+                    for _ in 0..call_pops {
+                        self.code.push(ByteCode::Pop { offset });
+                    }
+
+                    *pops += 1;
+                    self.stack_idx += 1;
+
+                    self.stack_idx -= call_pops;
+
+                    return self.stack_idx - 1;
+                }
                 let func_idx = self.resolve_fn_idx(name);
 
                 let mut call_pops = 0;
@@ -454,14 +512,100 @@ impl<'a> Translator<'a> {
     }
 }
 
-pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
+struct TranslationOutput {
+    main: Vec<ByteCode>,
+    fns: HashMap<String, InternalFn>,
+    
+}
+
+struct InternalFn {
+    code: Vec<ByteCode>,
+    params: Vec<String>,
+    call_resolution: Vec<ResolvableCall>,
+}
+
+fn translate_unit(stmts: &Vec<Stmt>, fns: &Vec<Function>, local_fns: &HashMap<String, bool>) -> (TranslationOutput, Vec<ResolvableCall>) {
     let mut translator = Translator {
         code: vec![],
         fns,
         stack_idx: 0,
         vars: HashMap::new(),
+        internal_fns: HashMap::new(),
+        call_resolution: vec![],
+        local_fns,
     };
     translator.translate_internal(stmts);
     translator.optimize();
-    translator.code
+    (TranslationOutput {
+        main: translator.code,
+        fns: translator.internal_fns,
+    }, translator.call_resolution)
+}
+
+struct IntermediateFn {
+    args: usize,
+    offset: usize,
+    call_res: Vec<ResolvableCall>,
+}
+
+fn discover_fn_defs(stmts: &Vec<Stmt>) -> anyhow::Result<HashMap<String, bool>> {
+    let mut defs = HashMap::new();
+    for stmt in stmts {
+        if let Stmt::DefineFn { name, stmts, .. } = stmt {
+            let mut has_val = None;
+            for stmt in stmts {
+                let val = if let Stmt::Return { val: Some(_) } = stmt {
+                    true
+                } else {
+                    false
+                };
+                if let Some(curr_val) = has_val {
+                    if curr_val != val {
+                        panic!("A function may only always or never return a value");
+                    }
+                } else {
+                    has_val = Some(val);
+                }
+            }
+            defs.insert(name.clone(), has_val.unwrap_or(false));
+        }
+    }
+    Ok(defs)
+}
+
+pub fn translate(stmts: &Vec<Stmt>, fns: &Vec<Function>) -> Vec<ByteCode> {
+    let fn_defs = discover_fn_defs(stmts).unwrap();
+    let res = translate_unit(stmts, fns, &fn_defs);
+
+    // resolve addresses of local functions at call sites
+    let mut bc = res.0.main;
+    let mut fn_stack = vec![];
+    let mut fn_lookup = HashMap::new();
+    for fun in res.0.fns {
+        fn_stack.push(IntermediateFn {
+            args: fun.1.params.len(),
+            offset: bc.len(),
+            call_res: fun.1.call_resolution,
+        });
+        fn_lookup.insert(fun.0.clone(), fn_stack.len() - 1);
+        bc.extend(fun.1.code);
+    }
+    for i in (0..fn_stack.len()).rev() {
+        for res in &fn_stack[i].call_res {
+            let fun = &fn_stack[*fn_lookup.get(&res.name).expect("Function call to unknown function")];
+            if fun.args != res.args {
+                panic!("Argument count mismatch");
+            }
+            bc[fn_stack[i].offset + res.location_idx] = ByteCode::CallLocal { relative_off: (fun.offset - res.location_idx) as isize };
+        }
+    }
+    // FIXME: handle functions with and without return value properly!
+    for res in res.1 {
+        let fun = &fn_stack[*fn_lookup.get(&res.name).expect("Function call to unknown function")];
+        if fun.args != res.args {
+            panic!("Argument count mismatch");
+        }
+        bc[res.location_idx] = ByteCode::CallLocal { relative_off: (fun.offset - res.location_idx) as isize };
+    }
+    bc
 }
