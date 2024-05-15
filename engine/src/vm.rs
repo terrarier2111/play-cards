@@ -182,6 +182,17 @@ impl Vm {
                     };
                     self.stack.push(RtRef::bool(*expected == cmp));
                 }
+                ByteCode::Return { has_val } => {
+                    let idx = if *has_val { 1 } else { 0 };
+                    let ip = self.stack.remove(self.stack.len() - 1 - idx).get_decimal().unwrap() as i64 as u64 as usize;
+                    self.ip = ip;
+                    continue;
+                },
+                ByteCode::CallLocal { relative_off } => {
+                    self.stack.push(RtRef::decimal(self.ip as f64));
+                    self.ip = (self.ip as isize + *relative_off) as usize;
+                    continue;
+                },
             }
             self.ip += 1;
         }
