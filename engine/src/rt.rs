@@ -71,6 +71,13 @@ impl RtRef {
         }
     }
 
+    pub fn list(val: Box<Vec<RtRef>>) -> Self {
+        Self {
+            ty: RtType::List,
+            val: Box::into_raw(val) as usize,
+        }
+    }
+
     pub fn get_player(self) -> Option<Player> {
         match self.ty() {
             RtType::Player => Some(Player(self.dst() as usize as u64)),
@@ -88,9 +95,23 @@ impl RtRef {
         }
     }
 
-    pub fn get_cards(&self) -> Option<&Vec<CardVal>> {
+    pub fn get_card(&self) -> Option<CardVal> {
         match self.ty() {
-            RtType::Cards => Some(unsafe { &*self.dst().cast::<Vec<CardVal>>() }),
+            RtType::Card => Some(CardVal(self.val as u64)),
+            _ => None,
+        }
+    }
+
+    pub fn get_list(&self) -> Option<&Vec<RtRef>> {
+        match self.ty() {
+            RtType::List => Some(unsafe { &*self.dst().cast::<Vec<RtRef>>() }),
+            _ => None,
+        }
+    }
+
+    pub fn get_list_mut(&self) -> Option<&mut Vec<RtRef>> {
+        match self.ty() {
+            RtType::List => Some(unsafe { &mut *self.dst().cast::<Vec<RtRef>>() }),
             _ => None,
         }
     }
@@ -140,6 +161,13 @@ impl RtRef {
         }
     }
 
+    pub fn get_func_idx(&self) -> Option<usize> {
+        match self.ty() {
+            RtType::Function => Some(self.val),
+            _ => None,
+        }
+    }
+
     pub fn to_string(self) -> String {
         match self.ty {
             RtType::Decimal => unsafe { transmute::<_, f64>(self.val) }.to_string(),
@@ -147,9 +175,10 @@ impl RtRef {
             RtType::Bool => unsafe { transmute::<_, bool>(self.val as u8) }.to_string(),
             RtType::String => unsafe { (self.val as *const String).as_ref().unwrap() }.clone(),
             RtType::Function => todo!(),
+            RtType::List => todo!(),
             RtType::Player => todo!(),
             RtType::Inventory => todo!(),
-            RtType::Cards => todo!(),
+            RtType::Card => todo!(),
         }
     }
 }
@@ -164,7 +193,7 @@ pub enum Ordering {
 }
 
 impl Ordering {
-    pub fn from_std(val: std::cmp::Ordering) -> Self {
+    pub const fn from_std(val: std::cmp::Ordering) -> Self {
         match val {
             std::cmp::Ordering::Less => Self::Less,
             std::cmp::Ordering::Equal => Self::Equal,
@@ -182,9 +211,10 @@ pub enum RtType {
     Bool = 2,
     String = 3,
     Function = 4,
-    Player = 5,
-    Inventory = 6,
-    Cards = 7,
+    List = 5,
+    Player = 6,
+    Inventory = 7,
+    Card = 8,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -196,11 +226,11 @@ pub struct CardVal(u64);
 pub struct Player(u64);
 
 impl Player {
-    pub fn new(idx: u64) -> Self {
+    pub const fn new(idx: u64) -> Self {
         Self(idx)
     }
 
-    pub fn idx(self) -> u64 {
+    pub const fn idx(self) -> u64 {
         self.0
     }
 }

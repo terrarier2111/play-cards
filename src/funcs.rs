@@ -101,5 +101,8 @@ pub fn load_meta(args: Vec<RtRef>) -> Option<RtRef> {
 }
 
 pub fn player_play(args: Vec<RtRef>) -> Option<RtRef> {
+    let player = args[0].get_player().unwrap();
+    let card_check_func = args[1].get_func_idx().unwrap();
+    let draw_invs = args.into_iter().skip(2).collect::<Vec<_>>();
     todo!()
 }

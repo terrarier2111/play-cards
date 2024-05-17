@@ -26,7 +26,7 @@ impl Vm {
             RtType::String => {
                 let _ = unsafe { Box::from_raw(val.dst()) };
             }
-            RtType::Cards => todo!(),
+            RtType::List => todo!(),
             _ => {}
         }
     }
@@ -37,7 +37,7 @@ impl Vm {
                 let cloned = unsafe { val.get_string_directly() }.clone();
                 RtRef::string(Box::new(cloned))
             }
-            RtType::Cards => todo!(),
+            RtType::List => todo!(),
             _ => val,
         }
     }
@@ -176,9 +176,11 @@ impl Vm {
                             }
                         }
                         RtType::String => todo!(),
+                        RtType::Function => todo!(),
                         RtType::Player => todo!(),
                         RtType::Inventory => todo!(),
-                        RtType::Cards => todo!(),
+                        RtType::Card => todo!(),
+                        RtType::List => todo!(),
                     };
                     self.stack.push(RtRef::bool(*expected == cmp));
                 }
