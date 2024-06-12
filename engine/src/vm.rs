@@ -37,7 +37,10 @@ impl Vm {
                 let cloned = unsafe { val.get_string_directly() }.clone();
                 RtRef::string(Box::new(cloned))
             }
-            RtType::List => todo!(),
+            RtType::List => {
+                let cloned = val.get_list().unwrap().clone();
+                RtRef::list(Box::new(cloned))
+            },
             _ => val,
         }
     }

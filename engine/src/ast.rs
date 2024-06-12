@@ -43,14 +43,6 @@ pub enum UserQuery {
     },
 }*/
 
-pub enum PlayerSrc {
-    Random,
-    LastRound,
-    NextRound,
-    Select,
-    // All,
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum AstNode {
     CallFunc {

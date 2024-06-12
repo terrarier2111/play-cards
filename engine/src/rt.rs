@@ -139,6 +139,10 @@ impl RtRef {
         }
     }
 
+    pub fn get_num(self) -> Option<u64> {
+        self.get_decimal().map(|val| val as u64)
+    }
+
     pub(crate) unsafe fn get_bool_directly(self) -> bool {
         unsafe { transmute(self.val as u8) }
     }

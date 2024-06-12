@@ -100,6 +100,21 @@ pub fn load_meta(args: Vec<RtRef>) -> Option<RtRef> {
     }
 }
 
+pub fn rand_players(args: Vec<RtRef>) -> Option<RtRef> {
+    let ctx = get_ctx();
+    if args.is_empty() {
+        loop {
+            let player = ctx.players[]
+        }
+    }
+    let amount = if !args.is_empty() { args[0].get_num().unwrap() } else { 1 };
+    let mut ret = vec![];
+    let mut indices = vec![];
+    for _ in 0..amount {
+        
+    }
+}
+
 pub fn player_play(args: Vec<RtRef>) -> Option<RtRef> {
     let player = args[0].get_player().unwrap();
     let card_check_func = args[1].get_func_idx().unwrap();
